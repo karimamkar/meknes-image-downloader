@@ -3,9 +3,6 @@
   "armoires.json"
  ],
  "pl": [
-  "points_lumineux_1.json",
-  "points_lumineux_2.json",
-  "points_lumineux_3.json",
-  "points_lumineux_4.json"
+  "points_lumineux.json"
  ]
 }

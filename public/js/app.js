@@ -17,6 +17,7 @@ const PHOTO_COLS = {
   armoires: { 'Photos extérieures': 'exterieur', 'Photos intérieures': 'interieur' },
   pl: { 'photo_poin': 'point', 'photos_lum': 'luminaire', 'photo_pied': 'pied' },
 };
+/* Seules ces colonnes sont affichées, filtrables et recherchables (liste, fiche, filtres). */
 const LIST_COLS = {
   armoires: [['Armoire FID','FID'],['Code','Code'],['Source','Source'],['Etat enveloppe','État enveloppe'],['Nombre depart','Départs']],
   pl: [['fid','FID'],['Armoire_FID','Armoire'],['Localisation','Localisation'],['Nom_modele_luminaire 1','Modèle'],['Puissance_Luminaire 1','P (W)'],['Hauteur_support','H (m)']],
@@ -25,7 +26,7 @@ const LIST_COLS = {
 const S = {
   type: 'armoires', view: 'list', page: 0,
   data: { armoires: [], pl: [] }, filtered: [],
-  cols: { armoires: [], pl: [] }, filters: [],
+  filters: [],
   map: null, cluster: null, flat: null, markers: [], mapMode: load('mapmode', 'auto'), mapDirty: true, current: null, lb: { list: [], i: 0 },
   batches: [], avgSize: null, avgMeasured: false,
 };
@@ -68,7 +69,7 @@ function normalize(type, rows) {
     const label = type === 'armoires'
       ? `Armoire ${id}${empty(r.Code) ? '' : ' — ' + String(r.Code).trim()}`
       : `PL ${id}${empty(r.Localisation) ? '' : ' — ' + r.Localisation}`;
-    const text = Object.values(r).filter(v => !empty(v)).join(' ').toLowerCase();
+    const text = LIST_COLS[type].map(([c]) => r[c]).filter(v => !empty(v)).join(' ').toLowerCase();
     return { type, id, lat: parseFloat(r.latitude), lng: parseFloat(r.longitude), label,
              armoire: type === 'armoires' ? id : r['Armoire_FID'], photos, raw: r, text };
   });
@@ -81,8 +82,6 @@ async function loadData() {
     const man = await fetch('data/manifest.json').then(r => r.json());
     for (const type of ['armoires', 'pl']) {
       const parts = await Promise.all(man[type].map(f => fetch('data/' + f).then(r => { if (!r.ok) throw new Error(f); return r.json(); })));
-      const photoCols = Object.keys(PHOTO_COLS[type]);
-      S.cols[type] = parts[0].cols.filter(c => !photoCols.includes(c) && !['latitude','longitude','Armoire_latitude','Armoire_longitude'].includes(c));
       setData(type, parts.flatMap(fromColumns));
     }
   } catch (e) {
@@ -250,8 +249,8 @@ function openDetail(i) {
     if (n) html += `<button class="btn small" id="d-goto-pl">Voir les ${n} points lumineux</button>`;
   }
   html += '</div>';
-  const attrs = Object.entries(e.raw).filter(([, v]) => !empty(v) && !splitPhotos(v).length);
-  html += `<div class="group"><h3>Attributs</h3><dl class="attrs">${attrs.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>`;
+  html += `<div class="group"><h3>Informations</h3><dl class="attrs">${LIST_COLS[e.type].map(([c, l]) =>
+    `<dt>${esc(l)}</dt><dd>${empty(e.raw[c]) ? '<span class="muted">—</span>' : esc(e.raw[c])}</dd>`).join('')}</dl></div>`;
   $('#d-body').innerHTML = html;
   $('#d-body').scrollTop = 0;
   $('#detail').classList.remove('hidden');
@@ -488,6 +487,7 @@ $('#b-list').addEventListener('click', ev => {
 
 /* ---------- Filtres par colonne ---------- */
 const OPS = { contains: 'contient', eq: 'est égal à', ne: 'est différent de', gt: 'est supérieur à', lt: 'est inférieur à', empty: 'est vide', filled: 'est renseigné' };
+const colLabel = c => (LIST_COLS[S.type].find(([k]) => k === c) || [c, c])[1];
 const norm = v => String(v ?? '').trim().toLowerCase();
 function matchFilter(v, f) {
   const n = parseFloat(String(v).replace(',', '.')), t = parseFloat(String(f.val).replace(',', '.'));
@@ -506,12 +506,11 @@ function renderChips() {
   const box = $('#chips');
   box.classList.toggle('hidden', !S.filters.length);
   box.innerHTML = S.filters.map((f, i) =>
-    `<span class="chip"><b>${esc(f.col)}</b> ${OPS[f.op]}${['empty', 'filled'].includes(f.op) ? '' : ` « ${esc(f.val)} »`}<button data-rm="${i}" aria-label="Retirer">✕</button></span>`).join('') +
+    `<span class="chip"><b>${esc(colLabel(f.col))}</b> ${OPS[f.op]}${['empty', 'filled'].includes(f.op) ? '' : ` « ${esc(f.val)} »`}<button data-rm="${i}" aria-label="Retirer">✕</button></span>`).join('') +
     (S.filters.length ? '<button class="link" data-rm="all">Tout effacer</button>' : '');
 }
 function openFilter() {
-  const cols = S.cols[S.type];
-  $('#fc-col').innerHTML = cols.map(c => `<option>${esc(c)}</option>`).join('');
+  $('#fc-col').innerHTML = LIST_COLS[S.type].map(([c, l]) => `<option value="${esc(c)}">${esc(l)}</option>`).join('');
   $('#fc-op').innerHTML = Object.entries(OPS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
   $('#fc-val').value = '';
   fillValues(); $('#fdlg').showModal();
@@ -533,7 +532,7 @@ $('#fdlg form').addEventListener('submit', ev => {
   const op = $('#fc-op').value, val = $('#fc-val').value.trim();
   if (!['empty', 'filled'].includes(op) && !val) { ev.preventDefault(); $('#fc-val').focus(); return; }
   S.filters.push({ col: $('#fc-col').value, op, val });
-  track('filter_add', { type: S.type, colonne: $('#fc-col').value, condition: OPS[op], valeur: val });
+  track('filter_add', { type: S.type, colonne: colLabel($('#fc-col').value), condition: OPS[op], valeur: val });
   S.page = 0; S.avgSize = null; apply();
 });
 $('#chips').addEventListener('click', ev => {
@@ -548,7 +547,7 @@ const describeFilters = () => [
   $('#q').value.trim() && `recherche « ${$('#q').value.trim()} »`,
   $('#f-armoire').value && `armoire ${$('#f-armoire').value}`,
   $('#f-photos').checked && 'avec photos',
-  ...S.filters.map(f => `${f.col} ${OPS[f.op]} ${f.val}`),
+  ...S.filters.map(f => `${colLabel(f.col)} ${OPS[f.op]} ${f.val}`),
 ].filter(Boolean).join(' ; ');
 
 /* ---------- Guides pas à pas et directives ---------- */
@@ -558,9 +557,9 @@ const DIRECTIVES = `
   <ul>
     <li>Partir du bon type : <b>Armoires</b> (postes et coffrets) ou <b>Points lumineux</b> (supports et luminaires).</li>
     <li>Cibler la zone de travail : choisir une <b>armoire</b> dans la liste, ou rechercher une rue / un quartier (champ Rechercher, colonne Localisation).</li>
-    <li>Affiner avec <b>Filtrer par colonne</b> : état du support, modèle, puissance, hauteur… Les filtres se cumulent.</li>
+    <li>Affiner avec <b>Filtrer par colonne</b> : modèle, puissance, hauteur, localisation pour les points lumineux ; code, source, état de l'enveloppe, départs pour les armoires. Les filtres se cumulent.</li>
     <li>Vérifier le compteur « éléments · photos » : c'est exactement ce qui sera téléchargé.</li>
-    <li>Sur la carte, cliquer un point pour ouvrir sa fiche (photos et attributs) ; le lien de la fiche permet de passer d'un point lumineux à son armoire et inversement.</li>
+    <li>Sur la carte, cliquer un point pour ouvrir sa fiche (photos et informations) ; le lien de la fiche permet de passer d'un point lumineux à son armoire et inversement.</li>
   </ul>
   <h4>Télécharger les photos — procédure</h4>
   <ol>
@@ -586,11 +585,11 @@ const TOURS = {
     { title: 'Bienvenue', wide: true, text: `Cette application est la <b>photothèque du SDAL de la ville de Meknès</b> : elle permet de consulter l'inventaire de l'éclairage public (armoires et points lumineux) et de <b>télécharger les photos</b> de terrain.<br><br>Ce guide présente les boutons essentiels en quelques étapes. Il est accessible à tout moment par le bouton <b>? Guide</b>.` },
     { el: '.navbar .seg', title: 'Armoires ou points lumineux', text: 'Choisissez le type d’élément à consulter. Le nombre d’éléments est indiqué sur chaque onglet. Les filtres et le téléchargement s’appliquent au type sélectionné.' },
     { el: '.navbar .seg:nth-of-type(2)', title: 'Liste ou carte', text: 'Basculez entre le tableau et la carte de Meknès. Sur la carte, cliquez sur un point pour voir ses photos.' },
-    { el: '#q', title: 'Rechercher', text: 'Recherche libre sur tous les attributs : FID, code d’armoire, rue / localisation, modèle de luminaire…' },
+    { el: '#q', title: 'Rechercher', text: 'Recherche dans les colonnes du tableau : FID, code d’armoire, rue / localisation, modèle de luminaire…' },
     { el: '#f-armoire', title: 'Filtrer par armoire', text: 'Sélectionnez une armoire pour n’afficher que ses points lumineux. <b>C’est la meilleure façon de préparer un téléchargement par secteur.</b>' },
-    { el: '#btn-filter', title: 'Filtrer par colonne', text: 'Ajoutez des conditions sur n’importe quel attribut (état, puissance, hauteur, modèle…). Les filtres se cumulent et s’affichent sous la barre ; un clic sur ✕ les retire.' },
+    { el: '#btn-filter', title: 'Filtrer par colonne', text: 'Ajoutez des conditions sur les colonnes du tableau (modèle, puissance, hauteur, localisation, code, état…). Les filtres se cumulent et s’affichent sous la barre ; un clic sur ✕ les retire.' },
     { el: '#summary', title: 'Votre sélection', text: 'Nombre d’éléments et de photos correspondant aux filtres. <b>C’est exactement ce qui sera téléchargé.</b>' },
-    { el: () => S.view === 'list' ? document.querySelector('#tbl tbody tr') : null, title: 'Ouvrir une fiche', text: 'Cliquez sur une ligne pour ouvrir la fiche : photos classées par type, agrandissement plein écran, attributs, lien vers l’armoire ou ses points lumineux.' },
+    { el: () => S.view === 'list' ? document.querySelector('#tbl tbody tr') : null, title: 'Ouvrir une fiche', text: 'Cliquez sur une ligne pour ouvrir la fiche : photos classées par type, agrandissement plein écran, informations, lien vers l’armoire ou ses points lumineux.' },
     { el: '#btn-zip', title: 'Télécharger les photos', text: 'Prépare les photos de la sélection en <b>lots ZIP de 1 à 2 Go</b>, à télécharger un par un. Chaque ZIP est rangé par armoire puis par point lumineux.' },
     { el: '#btn-links', title: 'Liste des liens', text: 'Alternative au ZIP : un fichier texte contenant l’adresse de chaque photo de la sélection, pour un gestionnaire de téléchargement.' },
     { el: '#btn-directives', title: 'Directives SRM', text: 'Les règles d’utilisation et la procédure de téléchargement recommandée. À lire avant le premier téléchargement.' },
@@ -609,7 +608,7 @@ const TOURS = {
     { el: '#d-body .gallery', title: 'Photos', text: 'Photos classées par type. Cliquez une photo pour l’agrandir (flèches ← → pour naviguer) ; l’icône ⤓ l’ouvre ou la télécharge seule.' },
     { el: '#d-zip', title: 'ZIP de l’élément', text: 'Télécharge toutes les photos de cet élément dans un seul ZIP.' },
     { el: '.links-row .btn', title: 'Navigation armoire ↔ points', text: 'Passez d’un point lumineux à son armoire, ou d’une armoire à la liste de ses points lumineux.' },
-    { el: () => [...document.querySelectorAll('#d-body .group h3')].find(h => h.textContent.startsWith('Attributs')), title: 'Attributs', text: 'Toutes les informations relevées sur le terrain pour cet élément (consultation uniquement).' },
+    { el: () => [...document.querySelectorAll('#d-body .group h3')].find(h => h.textContent.startsWith('Informations')), title: 'Informations', text: 'Les informations principales de l’élément, identiques aux colonnes du tableau.' },
   ],
   batches: () => [
     { el: '#b-info', title: 'Contenu du téléchargement', text: 'Nombre de photos, volume estimé et nombre de lots pour la sélection en cours.' },
