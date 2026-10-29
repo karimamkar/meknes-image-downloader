@@ -34,6 +34,7 @@ Space `streetlighting-audit` > Settings > CORS Configurations : origine = domain
 ## Structure
 
 ```
-index.html  css/styles.css  js/app.js  assets/ (logos)  data/ (extrait)
+public/  index.html  css/  js/  assets/ (logos)  data/ (extrait)
+wrangler.toml  (Cloudflare Pages : dossier de sortie public/, pas de commande de build)
 ```
 Bibliothèques via CDN : SheetJS, Leaflet + MarkerCluster, JSZip.
