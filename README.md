@@ -8,7 +8,8 @@ Application web **100 % statique** (aucun back-end) pour consulter les photos de
 - **Liste** ou **Carte** : la carte est limitée à la ville de Meknès. Les points sont regroupés jusqu'au zoom 16 puis tous affichés ; la case « Tous les points » supprime le regroupement. Les marqueurs sont dessinés sur canvas.
 - **Filtres** : recherche libre, armoire, « Avec photos », et **filtres par colonne** cumulables (contient, égal, différent, supérieur, inférieur, vide, renseigné).
 - **Fiche élément** : photos par type, visionneuse plein écran, attributs, lien armoire ↔ points lumineux.
-- **Mode d'emploi** affiché au premier usage, puis accessible par le bouton « ? Mode d'emploi ».
+- **Guide pas à pas** sur chaque écran (prise en main, carte, fiche, téléchargement, administration) : il pointe les boutons importants, avec Précédent / Suivant. Affiché automatiquement à la première visite de chaque écran (mémorisé dans le navigateur), relancé par le bouton **? Guide**.
+- **Directives SRM** : règles d'utilisation et procédure de téléchargement des photos pour les agents (bouton dédié et dernière étape du guide).
 
 ## Photos
 

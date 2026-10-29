@@ -37,6 +37,7 @@ $('#login-form').addEventListener('submit', async ev => {
     await api('login', { method: 'POST', body: JSON.stringify({ key: $('#key').value.trim() }) });
     $('#key').value = '';
     showApp(); await refresh();
+    setTimeout(() => Tour.run('admin', TOUR(), { title: 'Registre' }), 400);
   } catch (e) { $('#login-err').textContent = e.message; }
   $('#login-btn').disabled = false;
 });
@@ -118,6 +119,17 @@ $('#pager').addEventListener('click', ev => { const b = ev.target.closest('[data
 $('#tbl').addEventListener('click', ev => { const a = ev.target.closest('a.ip'); if (a) { $('#f-ip').value = a.dataset.ip; S.page = 0; loadTable(); } });
 $('#export').addEventListener('click', () => { location.href = '/api/admin/export.csv?' + params(); });
 
-api('me').then(() => { showApp(); refresh(); }).catch(() => showLogin());
+const TOUR = () => [
+  { title: 'Registre SDAL Meknès', text: 'Cette page trace l’utilisation de la photothèque : chaque visite, consultation et téléchargement, avec l’adresse IP et le poste utilisé.' },
+  { el: '.seg', title: 'Journal ou connexions', text: '<b>Journal des opérations</b> : chaque action, une par ligne. <b>Historique des connexions</b> : une ligne par session de navigation (durée, fiches consultées, lots téléchargés).' },
+  { el: '#kpis', title: 'Indicateurs', text: 'Visites, adresses IP et postes distincts, lots téléchargés. Les <b>échecs de connexion admin</b> apparaissent en rouge : plusieurs échecs peuvent signaler une tentative d’intrusion.' },
+  { el: '#f-from', title: 'Période', text: 'Limitez l’affichage à une période (du … au …).' },
+  { el: '#f-type', title: 'Type d’opération', text: 'Par exemple « Téléchargement d’un lot » pour suivre les extractions de photos.' },
+  { el: '#f-ip', title: 'Adresse IP', text: 'Saisissez une IP, ou cliquez sur une IP du tableau pour voir toute son activité.' },
+  { el: '#export', title: 'Export CSV', text: 'Exporte le journal filtré (ouvrable dans Excel).' },
+  { el: '#logout', title: 'Déconnexion', text: 'La session expire après 8 heures. Déconnectez-vous sur un poste partagé.' },
+];
+$('#btn-help').addEventListener('click', () => Tour.run('admin', TOUR(), { force: true, title: 'Registre' }));
+api('me').then(() => { showApp(); refresh(); setTimeout(() => Tour.run('admin', TOUR(), { title: 'Registre' }), 600); }).catch(() => showLogin());
 setInterval(() => { if (!$('#app').classList.contains('hidden')) loadStats().catch(() => {}); }, 60000);
 })();

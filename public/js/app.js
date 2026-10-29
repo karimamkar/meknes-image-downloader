@@ -89,7 +89,7 @@ async function loadData() {
     toast('Chargement de l’inventaire impossible : ' + e.message, 8000);
   }
   $('#loading').classList.add('hidden');
-  if (!load('help.v1', '')) openHelp();
+  setTimeout(() => Tour.run('main', TOURS.main(), { title: 'Prise en main' }), 300);
 }
 
 function setData(type, rows) {
@@ -167,9 +167,7 @@ function initMap() {
     chunkedLoading: true, disableClusteringAtZoom: CLUSTER_UNTIL_ZOOM, maxClusterRadius: 60,
     spiderfyOnMaxZoom: false, showCoverageOnHover: false, removeOutsideVisibleBounds: true,
   });
-  S.flat = L.layerGroup();
-  const onClick = ev => showPopup(ev.layer);
-  S.cluster.on('click', onClick); S.flat.on('click', onClick);
+  S.flat = L.featureGroup();
 
   const ModeCtl = L.Control.extend({
     onAdd() {
@@ -193,6 +191,7 @@ function buildMarkers() {
   S.filtered.forEach((e, i) => {
     if (!isFinite(e.lat) || !isFinite(e.lng)) return;
     const m = L.circleMarker([e.lat, e.lng], style); m._i = i;
+    m.on('click', ev => { L.DomEvent.stop(ev); showPopup(m); });
     S.markers.push(m);
   });
 }
@@ -258,6 +257,7 @@ function openDetail(i) {
   $('#detail').classList.remove('hidden');
   $('#d-goto-arm')?.addEventListener('click', () => gotoArmoire(e.armoire));
   $('#d-goto-pl')?.addEventListener('click', () => gotoPlOf(e.id));
+  if (!Tour.isActive()) setTimeout(() => Tour.run('detail', TOURS.detail(), { title: 'Fiche' }), 350);
 }
 window.__open = openDetail;
 
@@ -351,6 +351,7 @@ async function openBatches() {
   $('#b-note').textContent = window.showSaveFilePicker ? '' : 'Pour les lots de plus de 1 Go, utilisez de préférence Chrome ou Edge.';
   $('#b-note').classList.toggle('hidden', !$('#b-note').textContent);
   renderBatches();
+  if (!Tour.isActive()) setTimeout(() => Tour.run('batches', TOURS.batches(), { title: 'Téléchargement' }), 200);
 }
 
 function renderBatches() {
@@ -452,6 +453,7 @@ function setType(t) {
 document.querySelectorAll('[data-type]').forEach(b => b.addEventListener('click', () => setType(b.dataset.type)));
 document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
   S.view = b.dataset.view; track('view', { vue: S.view, type: S.type });
+  if (S.view === 'map' && !Tour.isActive()) setTimeout(() => Tour.run('map', TOURS.map(), { title: 'Carte' }), 900);
   document.querySelectorAll('[data-view]').forEach(x => x.classList.toggle('active', x === b));
   $('#list-view').classList.toggle('hidden', S.view !== 'list');
   $('#map-view').classList.toggle('hidden', S.view !== 'map');
@@ -542,15 +544,94 @@ $('#chips').addEventListener('click', ev => {
 });
 
 /* ---------- Aide (premier usage) ---------- */
-function openHelp() { $('#help').showModal(); track('help_open'); }
 const describeFilters = () => [
   $('#q').value.trim() && `recherche « ${$('#q').value.trim()} »`,
   $('#f-armoire').value && `armoire ${$('#f-armoire').value}`,
   $('#f-photos').checked && 'avec photos',
   ...S.filters.map(f => `${f.col} ${OPS[f.op]} ${f.val}`),
 ].filter(Boolean).join(' ; ');
-$('#btn-help').addEventListener('click', openHelp);
-$('#help').addEventListener('close', () => save('help.v1', '1'));
+
+/* ---------- Guides pas à pas et directives ---------- */
+const DIRECTIVES = `
+  <p><b>Usage réservé</b> aux agents habilités de la SRM Fès-Meknès. Les données et photos sont à usage interne : ne pas les diffuser à des tiers. <span class="warn">Toutes les consultations et tous les téléchargements sont journalisés (date, adresse IP, poste).</span></p>
+  <h4>Exploiter la base</h4>
+  <ul>
+    <li>Partir du bon type : <b>Armoires</b> (postes et coffrets) ou <b>Points lumineux</b> (supports et luminaires).</li>
+    <li>Cibler la zone de travail : choisir une <b>armoire</b> dans la liste, ou rechercher une rue / un quartier (champ Rechercher, colonne Localisation).</li>
+    <li>Affiner avec <b>Filtrer par colonne</b> : état du support, modèle, puissance, hauteur… Les filtres se cumulent.</li>
+    <li>Vérifier le compteur « éléments · photos » : c'est exactement ce qui sera téléchargé.</li>
+    <li>Sur la carte, cliquer un point pour ouvrir sa fiche (photos et attributs) ; le lien de la fiche permet de passer d'un point lumineux à son armoire et inversement.</li>
+  </ul>
+  <h4>Télécharger les photos — procédure</h4>
+  <ol>
+    <li>Utiliser <b>Google Chrome ou Microsoft Edge</b> sur un ordinateur, avec une connexion stable.</li>
+    <li>Prévoir l'espace disque : environ <b>1,5 Go par lot</b>. L'ensemble des points lumineux représente plusieurs dizaines de Go : <b>préférer un téléchargement par armoire ou par secteur</b>.</li>
+    <li>Filtrer la sélection, puis cliquer <b>Télécharger les photos…</b> : la liste des lots s'affiche.</li>
+    <li>Cliquer <b>Télécharger</b> sur le premier lot et choisir le dossier d'enregistrement. <b>Un lot à la fois</b>.</li>
+    <li>Pendant le téléchargement : <span class="warn">ne pas fermer l'onglet, ne pas mettre l'ordinateur en veille</span>.</li>
+    <li>À la fin, le lot passe en vert. Si le ZIP contient un fichier <b>erreurs.txt</b>, relancer le lot (bouton Retélécharger).</li>
+    <li>Passer au lot suivant et cocher mentalement l'avancement : chaque lot indique la plage d'armoires couverte.</li>
+  </ol>
+  <h4>Organisation des fichiers</h4>
+  <ul>
+    <li>Les ZIP sont rangés par <b>armoire → point lumineux → type de photo</b> (point, luminaire, pied ; extérieur, intérieur pour les armoires).</li>
+    <li><b>Ne pas renommer les photos</b> : le nom du fichier est la référence de la photo dans la base SIG.</li>
+    <li>Pour quelques photos seulement : ouvrir la fiche et utiliser <b>⤓ ZIP</b> (un élément) ou l'icône ⤓ d'une photo.</li>
+    <li><b>Liens (.txt)</b> fournit la liste des adresses des photos pour un gestionnaire de téléchargement (en cas de difficulté avec les ZIP).</li>
+  </ul>
+  <p class="muted">En cas de problème (lot en erreur répété, photo manquante), noter le nom du lot ou le FID de l'élément et le transmettre au référent SDAL.</p>`;
+
+const TOURS = {
+  main: () => [
+    { title: 'Bienvenue', wide: true, text: `Cette application est la <b>photothèque du SDAL de la ville de Meknès</b> : elle permet de consulter l'inventaire de l'éclairage public (armoires et points lumineux) et de <b>télécharger les photos</b> de terrain.<br><br>Ce guide présente les boutons essentiels en quelques étapes. Il est accessible à tout moment par le bouton <b>? Guide</b>.` },
+    { el: '.navbar .seg', title: 'Armoires ou points lumineux', text: 'Choisissez le type d’élément à consulter. Le nombre d’éléments est indiqué sur chaque onglet. Les filtres et le téléchargement s’appliquent au type sélectionné.' },
+    { el: '.navbar .seg:nth-of-type(2)', title: 'Liste ou carte', text: 'Basculez entre le tableau et la carte de Meknès. Sur la carte, cliquez sur un point pour voir ses photos.' },
+    { el: '#q', title: 'Rechercher', text: 'Recherche libre sur tous les attributs : FID, code d’armoire, rue / localisation, modèle de luminaire…' },
+    { el: '#f-armoire', title: 'Filtrer par armoire', text: 'Sélectionnez une armoire pour n’afficher que ses points lumineux. <b>C’est la meilleure façon de préparer un téléchargement par secteur.</b>' },
+    { el: '#btn-filter', title: 'Filtrer par colonne', text: 'Ajoutez des conditions sur n’importe quel attribut (état, puissance, hauteur, modèle…). Les filtres se cumulent et s’affichent sous la barre ; un clic sur ✕ les retire.' },
+    { el: '#summary', title: 'Votre sélection', text: 'Nombre d’éléments et de photos correspondant aux filtres. <b>C’est exactement ce qui sera téléchargé.</b>' },
+    { el: () => S.view === 'list' ? document.querySelector('#tbl tbody tr') : null, title: 'Ouvrir une fiche', text: 'Cliquez sur une ligne pour ouvrir la fiche : photos classées par type, agrandissement plein écran, attributs, lien vers l’armoire ou ses points lumineux.' },
+    { el: '#btn-zip', title: 'Télécharger les photos', text: 'Prépare les photos de la sélection en <b>lots ZIP de 1 à 2 Go</b>, à télécharger un par un. Chaque ZIP est rangé par armoire puis par point lumineux.' },
+    { el: '#btn-links', title: 'Liste des liens', text: 'Alternative au ZIP : un fichier texte contenant l’adresse de chaque photo de la sélection, pour un gestionnaire de téléchargement.' },
+    { el: '#btn-directives', title: 'Directives SRM', text: 'Les règles d’utilisation et la procédure de téléchargement recommandée. À lire avant le premier téléchargement.' },
+    { el: '#btn-help', title: 'Revoir le guide', text: 'Ce bouton relance le guide de l’écran affiché (liste, carte, fiche ou téléchargement).' },
+    { title: 'Directives pour les agents SRM', wide: true, text: DIRECTIVES },
+  ],
+  map: () => [
+    { el: '#map', title: 'Carte de Meknès', text: 'La carte est limitée à la ville. Faites glisser pour vous déplacer, molette ou boutons + / − pour zoomer. Les points sont regroupés (pastilles numérotées) aux petites échelles et tous affichés à partir du zoom 16.' },
+    { el: '.map-mode', title: 'Tous les points', text: 'Cochez pour afficher chaque point individuellement, sans regroupement, quel que soit le zoom.' },
+    { el: '.leaflet-control-layers', title: 'Fond de carte', text: 'Choisissez le fond <b>Plan</b> ou <b>Satellite</b>.' },
+    { el: '.leaflet-control-zoom', title: 'Zoom', text: 'Zoomez sur un quartier ; cliquez une pastille de regroupement pour zoomer dessus.' },
+    { title: 'Ouvrir un point', text: 'Cliquez sur un point : un aperçu des photos apparaît, avec le bouton <b>Voir le détail</b> pour ouvrir la fiche complète. Les filtres de la barre s’appliquent aussi à la carte.' },
+  ],
+  detail: () => [
+    { el: '#d-title', title: 'Fiche de l’élément', text: 'Identifiant et localisation de l’armoire ou du point lumineux.' },
+    { el: '#d-body .gallery', title: 'Photos', text: 'Photos classées par type. Cliquez une photo pour l’agrandir (flèches ← → pour naviguer) ; l’icône ⤓ l’ouvre ou la télécharge seule.' },
+    { el: '#d-zip', title: 'ZIP de l’élément', text: 'Télécharge toutes les photos de cet élément dans un seul ZIP.' },
+    { el: '.links-row .btn', title: 'Navigation armoire ↔ points', text: 'Passez d’un point lumineux à son armoire, ou d’une armoire à la liste de ses points lumineux.' },
+    { el: () => [...document.querySelectorAll('#d-body .group h3')].find(h => h.textContent.startsWith('Attributs')), title: 'Attributs', text: 'Toutes les informations relevées sur le terrain pour cet élément (consultation uniquement).' },
+  ],
+  batches: () => [
+    { el: '#b-info', title: 'Contenu du téléchargement', text: 'Nombre de photos, volume estimé et nombre de lots pour la sélection en cours.' },
+    { el: '.batch', title: 'Un lot = un ZIP', text: 'Chaque lot fait environ 1,5 Go. Il indique le nombre d’éléments, de photos et la plage d’armoires couverte.' },
+    { el: '.batch [data-act=zip]', title: 'Télécharger un lot', text: 'Choisissez le dossier d’enregistrement : le ZIP s’écrit au fur et à mesure. <b>Un lot à la fois</b> ; ne fermez pas l’onglet pendant le téléchargement. Le lot passe en vert une fois terminé.' },
+    { el: '.batch [data-act=txt]', title: 'Liens du lot', text: 'Liste des adresses des photos de ce lot, en cas de difficulté avec le ZIP.' },
+    { title: 'Après le téléchargement', text: 'Si le ZIP contient un fichier <b>erreurs.txt</b>, relancez le lot. Ne renommez pas les photos : leur nom est la référence SIG.' },
+  ],
+};
+
+function contextTour(force) {
+  if ($('#batches').open) return Tour.run('batches', TOURS.batches(), { force, title: 'Téléchargement' });
+  if (!$('#detail').classList.contains('hidden')) return Tour.run('detail', TOURS.detail(), { force, title: 'Fiche' });
+  if (S.view === 'map') return Tour.run('map', TOURS.map(), { force, title: 'Carte' });
+  return Tour.run('main', TOURS.main(), { force, title: 'Prise en main' });
+}
+$('#btn-help').addEventListener('click', () => { track('help_open', { ecran: $('#batches').open ? 'batches' : S.view }); contextTour(true); });
+$('#d-help').addEventListener('click', () => Tour.run('detail', TOURS.detail(), { force: true, title: 'Fiche' }));
+$('#b-help').addEventListener('click', () => Tour.run('batches', TOURS.batches(), { force: true, title: 'Téléchargement' }));
+$('#directives-body').innerHTML = DIRECTIVES;
+$('#btn-directives').addEventListener('click', () => { $('#directives').showModal(); track('help_open', { ecran: 'directives' }); });
+$('#dir-tour').addEventListener('click', () => { $('#directives').close(); S.view === 'list' || document.querySelector('[data-view=list]').click(); Tour.run('main', TOURS.main(), { force: true, title: 'Prise en main' }); });
 
 track('visit', { ecran: `${screen.width}x${screen.height}`, langue: navigator.language, provenance: document.referrer || '' });
 loadData();

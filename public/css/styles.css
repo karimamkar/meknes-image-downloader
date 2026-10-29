@@ -142,3 +142,31 @@ button.link{border:0;background:transparent;color:var(--accent);font-size:13px;t
 .map-mode{background:var(--panel);color:var(--ink);padding:8px 10px;font-size:13px}
 .map-mode label{display:flex;gap:6px;align-items:center;margin:0;font-weight:500;cursor:pointer}
 .map-mode small{display:block;color:var(--muted);margin-top:2px}
+
+/* ---------- Guide pas à pas ---------- */
+.tour{position:fixed;inset:0;z-index:5000}
+.tour-shade{position:absolute;inset:0;background:rgba(6,10,16,.6)}
+.tour-spot{position:fixed;border-radius:10px;box-shadow:0 0 0 3px var(--accent),0 0 0 9999px rgba(6,10,16,.6);transition:all .25s ease;pointer-events:none}
+.tour-pop{position:fixed;width:min(380px,calc(100vw - 24px));background:var(--panel);color:var(--ink);border-radius:12px;padding:16px 18px 12px;box-shadow:0 18px 50px rgba(0,0,0,.35);transition:left .25s ease,top .25s ease}
+.tour-pop.wide{width:min(620px,calc(100vw - 24px))}
+.tour-pop.pos-center{left:50%!important;top:50%!important;transform:translate(-50%,-50%)}
+.tour-pop.pos-bottom::before,.tour-pop.pos-top::before{content:"";position:absolute;left:var(--arrow-x,50%);width:14px;height:14px;background:var(--panel);transform:translateX(-50%) rotate(45deg)}
+.tour-pop.pos-bottom::before{top:-7px}.tour-pop.pos-top::before{bottom:-7px}
+.tour-step{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
+.tour-title{margin:4px 0 6px;font-size:16px}
+.tour-text{font-size:14px;line-height:1.55;color:var(--ink)}
+.tour-text ul,.tour-text ol{margin:6px 0;padding-left:20px}.tour-text li{margin:3px 0}
+.tour-text .warn{color:var(--warn);font-weight:600}
+.tour-foot{display:flex;align-items:center;gap:10px;margin-top:14px}
+.tour-skip{border:0;background:transparent;color:var(--muted);font-size:12px;text-decoration:underline;padding:0}
+.tour-dots{flex:1;display:flex;gap:3px;justify-content:center;min-width:0;overflow:hidden}
+.tour-dots i{flex:none;width:5px;height:5px;border-radius:50%;background:var(--line)}.tour-dots i.on{background:var(--accent)}
+.tour-nav{display:flex;gap:6px}
+.help-menu{position:relative}
+.modal{max-height:92vh;overflow:auto}
+.directives{font-size:14px;line-height:1.55;margin-top:10px}
+.directives h4{margin:16px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent)}
+.directives ul,.directives ol{margin:0;padding-left:22px}.directives li{margin:4px 0}
+.directives .warn,.tour-text .warn{color:var(--warn);font-weight:600}
+.tour-text h4{margin:12px 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent)}
+.tour-pop.wide .tour-text{max-height:58vh;overflow:auto;padding-right:4px}

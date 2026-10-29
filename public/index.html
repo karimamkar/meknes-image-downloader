@@ -32,7 +32,8 @@
     <button class="seg-btn view" data-view="map">◎ Carte</button>
   </div>
   <div class="spacer"></div>
-  <button id="btn-help" class="btn" title="Mode d'emploi">? Mode d'emploi</button>
+  <button id="btn-directives" class="btn" title="Directives d'utilisation pour les agents SRM">📋 Directives SRM</button>
+  <button id="btn-help" class="btn primary" title="Afficher le guide de cet écran">? Guide</button>
 </nav>
 
 <section class="toolbar">
@@ -60,6 +61,7 @@
   <div class="drawer-head">
     <div><div class="eyebrow" id="d-kind"></div><h2 id="d-title"></h2></div>
     <div class="drawer-actions">
+      <button id="d-help" class="icon-btn" title="Guide de la fiche" aria-label="Guide">?</button>
       <button id="d-zip" class="btn primary small">⤓ ZIP</button>
       <button id="d-close" class="icon-btn" aria-label="Fermer">✕</button>
     </div>
@@ -77,7 +79,8 @@
 <dialog id="batches" class="modal wide">
   <div class="modal-head">
     <div><h3 id="b-title">Téléchargement par lots</h3><p class="muted" id="b-info"></p></div>
-    <button class="icon-btn" id="b-close" aria-label="Fermer">✕</button>
+    <div class="drawer-actions"><button class="icon-btn" id="b-help" title="Guide du téléchargement" aria-label="Guide">?</button>
+    <button class="icon-btn" id="b-close" aria-label="Fermer">✕</button></div>
   </div>
   <p class="note" id="b-note"></p>
   <div id="b-list" class="batch-list"></div>
@@ -93,18 +96,13 @@
   </form>
 </dialog>
 
-<dialog id="help" class="modal wide">
+<dialog id="directives" class="modal wide">
   <form method="dialog">
-    <div class="modal-head"><div><h3>Mode d'emploi</h3><p class="muted">SDAL de la ville de Meknès — photothèque de l'éclairage public</p></div></div>
-    <ol class="steps">
-      <li><b>Choisir le type d'élément</b> : <i>Armoires</i> ou <i>Points lumineux</i>, en haut à gauche. Le nombre d'éléments est affiché sur chaque onglet.</li>
-      <li><b>Affiner la sélection</b> : recherche libre (FID, code, rue, modèle…), choix d'une armoire, case <i>Avec photos</i>, et <i>Filtrer par colonne</i> pour combiner des critères sur n'importe quel attribut (ex. « Puissance_Luminaire 1 est supérieur à 100 »). Les filtres actifs s'affichent sous la barre ; un clic sur ✕ les retire.</li>
-      <li><b>Consulter</b> : en vue <i>Liste</i> ou <i>Carte</i>, cliquez sur un élément pour ouvrir sa fiche : photos classées par type, agrandissement plein écran (flèches ← →), attributs, et lien vers l'armoire ou ses points lumineux.</li>
-      <li><b>Carte</b> : limitée à la ville de Meknès. Les points sont regroupés aux petites échelles et tous affichés à partir du zoom 16 ; cochez <i>Tous les points</i> pour supprimer le regroupement. Fond plan ou satellite au choix.</li>
-      <li><b>Télécharger</b> : le bouton bleu prépare les photos de la sélection en lots ZIP de 1 à 2 Go, à télécharger un par un. Chaque ZIP est rangé par armoire puis par point lumineux. <i>Liste des liens</i> fournit les adresses des photos pour un gestionnaire de téléchargement. Dans une fiche, <i>ZIP</i> télécharge les photos d'un seul élément.</li>
-    </ol>
-    <p class="note">Conseil : utilisez Chrome ou Edge pour les gros téléchargements ; le navigateur demande où enregistrer chaque lot.</p>
-    <menu><button class="btn primary" value="ok">J'ai compris</button></menu>
+    <div class="modal-head"><div><h3>Directives d'utilisation — agents SRM Fès-Meknès</h3>
+      <p class="muted">Exploitation de la base SDAL de Meknès et téléchargement des photos</p></div>
+      <button class="icon-btn" value="close" aria-label="Fermer">✕</button></div>
+    <div class="directives" id="directives-body"></div>
+    <menu><button class="btn" type="button" id="dir-tour">Revoir le guide pas à pas</button><button class="btn primary" value="ok">J'ai compris</button></menu>
   </form>
 </dialog>
 
@@ -112,6 +110,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script src="js/tour.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
