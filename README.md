@@ -4,14 +4,14 @@ Application web **100 % statique** (aucun back-end) pour parcourir les armoires 
 
 ## Utilisation
 
-1. Ouvrir `index.html` via un serveur HTTP (GitHub Pages, ou en local : `python -m http.server`). Un extrait (`data/sample_*.xlsx` : 6 armoires, 106 PL) se charge au démarrage.
-2. **⚙ Paramètres** : charger les fichiers complets `SIG_Armoires.xlsx` et `SIG_Points_Lumineux.xlsx` (lus dans le navigateur, rien n'est envoyé), modifier l'URL des images si besoin.
-3. Onglets **Armoires / Points lumineux**, vue **Liste** ou **Carte** (clusters, fond plan ou satellite). Filtres : recherche texte, armoire, « avec photos ».
-4. Clic sur un élément : galerie par type de photo, visionneuse (flèches ←/→), attributs, lien vers l'armoire ou ses PL.
+1. L'inventaire complet (657 armoires, 36 491 points lumineux) est chargé au démarrage depuis `public/data/` (JSON généré à partir des Excel SIG).
+2. Onglets **Armoires / Points lumineux**, vue **Liste** ou **Carte** (clusters, fond plan ou satellite). Filtres : recherche texte, armoire, « avec photos ».
+3. Clic sur un élément : galerie par type de photo, visionneuse (←/→), attributs, lien vers l'armoire ou ses PL, ZIP de l'élément.
+4. **⚙ Paramètres** : URL des images, téléchargements simultanés, chargement d'autres fichiers Excel.
 
 ## Photos
 
-URL = `https://streetlighting-audit.lon1.digitaloceanspaces.com/` + nom du fichier.
+URL = `https://streetlighting-audit.lon1.digitaloceanspaces.com/photos/` + nom du fichier.
 Les cellules contenant plusieurs noms (séparés par virgules) sont éclatées ; une valeur `0` ou vide = pas de photo.
 
 | Type | Colonnes | Dossier |
@@ -23,13 +23,14 @@ Une photo trouvée dans une autre colonne est classée dans `autres`.
 
 ## Téléchargement (sur la sélection filtrée)
 
-- **ZIP** : construit dans le navigateur, arborescence `armoires/<FID>/<type>/…` et `points_lumineux/armoire_<FID>/PL_<fid>/<type>/…`. Nécessite que le bucket autorise le CORS (voir ci-dessous). Au-delà de ~3 000 photos, filtrer par armoire.
-- **Script PowerShell** : télécharge toute la sélection avec la même arborescence, reprend là où il s'est arrêté, journalise les erreurs. Recommandé pour les gros volumes (107 000 photos au total).
-- **Liste des liens (.txt)** : une URL par ligne (gestionnaire de téléchargement, `wget -i`, etc.).
+- **Télécharger (ZIP)** : découpe la sélection en lots d'environ 1,5 Go (entre 1 et 2 Go), chacun avec son bouton. La taille moyenne des photos est mesurée sur un échantillon. Un élément n'est jamais coupé entre deux lots ; les PL sont triés par armoire, ceux sans armoire en fin.
+  Arborescence : `armoires/<FID>/<type>/…` et `points_lumineux/armoire_<FID|sans>/PL_<fid>/<type>/…`.
+  Sous Chrome/Edge, le ZIP est écrit directement sur le disque (pas de limite mémoire) ; ailleurs, il est construit en mémoire.
+- **Liste des liens (.txt)** : une URL par ligne, pour la sélection ou pour un lot.
 
 ### Activer le CORS sur le Space DigitalOcean (pour le ZIP)
 
-Space `streetlighting-audit` > Settings > CORS Configurations : origine = domaine de l'app (ex. `https://karimamkar.github.io`), méthodes `GET`, `HEAD`, en-têtes `*`.
+Space `streetlighting-audit` > Settings > CORS Configurations : origine = domaine de l'app (domaine du Worker Cloudflare), méthodes `GET`, `HEAD`, en-têtes `*`.
 
 ## Structure
 
@@ -37,4 +38,4 @@ Space `streetlighting-audit` > Settings > CORS Configurations : origine = domain
 public/  index.html  css/  js/  assets/ (logos)  data/ (extrait)
 wrangler.toml  (Cloudflare Workers : assets statiques servis depuis public/, déploiement `npx wrangler deploy`)
 ```
-Bibliothèques via CDN : SheetJS, Leaflet + MarkerCluster, JSZip.
+Bibliothèques via CDN : Leaflet + MarkerCluster, client-zip (ZIP en streaming), SheetJS (chargé seulement pour importer un Excel).
