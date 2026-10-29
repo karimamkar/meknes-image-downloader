@@ -25,3 +25,25 @@ a.btn{text-decoration:none;color:inherit}
 .admin-main tbody tr{cursor:default}
 .btn.danger{background:var(--warn);border-color:var(--warn);color:#fff}
 .btn.danger:hover{filter:brightness(1.1);background:var(--warn)}
+@media (max-width:760px){
+  .admin .navbar{flex-wrap:wrap}
+  .admin .navbar .seg{flex:1 1 100%}
+  .admin .navbar .seg-btn{flex:1;justify-content:center;font-size:13px;padding:8px 6px}
+  .admin .navbar>.btn,.admin .navbar>a.btn{flex:1;text-align:center;padding:8px 6px;font-size:13px}
+  .kpis{grid-template-columns:repeat(2,1fr);gap:8px;padding:10px}
+  .kpi{padding:10px 12px}.kpi b{font-size:19px}
+  .admin .toolbar{padding:8px 10px}
+  .admin .toolbar>*{flex:1 1 45%}
+  .admin .toolbar label{flex:1 1 45%}.admin .toolbar label input{flex:1;min-width:0}
+  .admin .toolbar .spacer{display:none}
+  #f-q{min-width:0;flex:1 1 100%}
+  .admin-main{padding:0 10px 20px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .admin-main table{min-width:760px}
+  .login{padding:24px 12px}
+  .card{padding:20px}
+}
+@media (max-width:760px){
+  .kpis{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:8px;padding:10px;-webkit-overflow-scrolling:touch}
+  .kpi{flex:0 0 132px;scroll-snap-align:start;padding:8px 10px}
+  .kpi b{font-size:18px}.kpi span{font-size:11px;line-height:1.3;display:block}
+}

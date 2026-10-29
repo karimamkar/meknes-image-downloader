@@ -9,6 +9,7 @@ Application web **100 % statique** (aucun back-end) pour consulter les photos de
 - **Filtres** : recherche libre, armoire, « Avec photos », et **filtres par colonne** cumulables (sur les colonnes affichées) (contient, égal, différent, supérieur, inférieur, vide, renseigné).
 - **Fiche élément** : photos par type, visionneuse plein écran, informations du tableau, lien armoire ↔ points lumineux.
 - **Guide pas à pas** sur chaque écran (prise en main, carte, fiche, téléchargement, administration) : il pointe les boutons importants, avec Précédent / Suivant. Affiché automatiquement à la première visite de chaque écran (mémorisé dans le navigateur), relancé par le bouton **? Guide**.
+- **Mobile** : en-tête compact, filtres repliables (bouton « Filtres »), barre de téléchargement fixée en bas, liste en cartes avec aperçu des photos, fiche en plein écran, visionneuse avec balayage gauche/droite.
 - **Directives SRM** : règles d'utilisation et procédure de téléchargement des photos pour les agents (bouton dédié et dernière étape du guide).
 
 ## Données publiées

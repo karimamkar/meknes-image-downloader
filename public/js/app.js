@@ -88,7 +88,7 @@ async function loadData() {
     toast('Chargement de l’inventaire impossible : ' + e.message, 8000);
   }
   $('#loading').classList.add('hidden');
-  setTimeout(() => Tour.run('main', TOURS.main(), { title: 'Prise en main' }), 300);
+  setTimeout(() => Tour.run('main', TOURS.main(), { title: 'Prise en main', onClose: () => setMore(false) }), 300);
 }
 
 function setData(type, rows) {
@@ -116,6 +116,8 @@ function apply() {
     (!arm || String(e.armoire) === arm) && (!onlyPh || e.photos.length) && (!q || e.text.includes(q)) &&
     fl.every(f => matchFilter(e.raw[f.col], f)));
   renderChips();
+  const nf = S.filters.length + (arm ? 1 : 0) + (onlyPh ? 1 : 0);
+  $('#more-count').textContent = nf ? ` · ${nf}` : '';
   const n = S.filtered.reduce((s, e) => s + e.photos.length, 0);
   $('#summary').innerHTML = `<b>${fmt(S.filtered.length)}</b> éléments · <b>${fmt(n)}</b> photos`;
   S.mapDirty = true;
@@ -131,8 +133,8 @@ function renderList() {
   S.page = Math.min(S.page, pages - 1);
   const slice = S.filtered.slice(S.page * PAGE, (S.page + 1) * PAGE);
   $('#tbl tbody').innerHTML = slice.map((e, i) =>
-    `<tr data-i="${S.page * PAGE + i}">` + cols.map(c => `<td>${esc(e.raw[c[0]])}</td>`).join('') +
-    `<td><span class="badge${e.photos.length ? '' : ' zero'}">${e.photos.length}</span></td>` +
+    `<tr data-i="${S.page * PAGE + i}">` + cols.map((c, k) => `<td data-label="${esc(c[1])}"${k === 0 ? ' class="key"' : ''}>${empty(e.raw[c[0]]) ? '<span class="muted">—</span>' : esc(e.raw[c[0]])}</td>`).join('') +
+    `<td data-label="Photos" class="count"><span class="badge${e.photos.length ? '' : ' zero'}">${e.photos.length}</span></td>` +
     `<td class="thumbs">${e.photos.slice(0, 3).map(p => `<img loading="lazy" src="${esc(photoUrl(p.file))}" alt="" onerror="this.style.visibility='hidden'">`).join('')}</td></tr>`
   ).join('') || `<tr><td colspan="${cols.length + 2}" class="muted">Aucun élément.</td></tr>`;
   $('#pager').innerHTML = pages > 1
@@ -171,7 +173,7 @@ function initMap() {
   const ModeCtl = L.Control.extend({
     onAdd() {
       const d = L.DomUtil.create('div', 'leaflet-bar map-mode');
-      d.innerHTML = `<label><input type="checkbox" ${S.mapMode === 'all' ? 'checked' : ''}> Tous les points (sans regroupement)</label>
+      d.innerHTML = `<label><input type="checkbox" ${S.mapMode === 'all' ? 'checked' : ''}> Tous les points<span class="lbl-long"> (sans regroupement)</span></label>
         <small>Regroupement automatique jusqu'au zoom ${CLUSTER_UNTIL_ZOOM}</small>`;
       L.DomEvent.disableClickPropagation(d);
       d.querySelector('input').addEventListener('change', ev => { S.mapMode = ev.target.checked ? 'all' : 'auto'; save('mapmode', S.mapMode); placeMarkers(); });
@@ -275,6 +277,25 @@ function showLb() {
   $('#lb-cap').textContent = `${p.group} · ${p.file} (${i + 1}/${list.length})`;
 }
 function stepLb(d) { S.lb.i = (S.lb.i + d + S.lb.list.length) % S.lb.list.length; showLb(); }
+// Balayage gauche/droite sur mobile
+let swipeX = null;
+$('#lightbox').addEventListener('touchstart', ev => { swipeX = ev.touches[0].clientX; }, { passive: true });
+$('#lightbox').addEventListener('touchend', ev => {
+  if (swipeX === null) return;
+  const dx = ev.changedTouches[0].clientX - swipeX; swipeX = null;
+  if (Math.abs(dx) > 50) stepLb(dx < 0 ? 1 : -1);
+});
+
+/* ---------- Mobile : panneau de filtres repliable ---------- */
+const isMobile = () => matchMedia('(max-width: 760px)').matches;
+function setMore(open) {
+  $('#toolbar').classList.toggle('open', open);
+  $('#btn-more').setAttribute('aria-expanded', open);
+  if (S.map) setTimeout(() => S.map.invalidateSize(), 50);
+}
+if (isMobile()) $('#q').placeholder = 'Rechercher (FID, rue, modèle…)';
+$('#btn-more').addEventListener('click', () => setMore(!$('#toolbar').classList.contains('open')));
+const openMoreIfMobile = () => { if (isMobile()) setMore(true); };
 
 /* ---------- Fichiers ---------- */
 function zipPath(e, p) {
@@ -445,7 +466,7 @@ function toast(msg, ms = 4000) {
 function setType(t) {
   if (t !== S.type) track('type', { type: t });
   S.type = t; S.page = 0; S.avgSize = null; S.filters = [];
-  $('#btn-zip').textContent = t === 'armoires' ? '⤓ Télécharger les photos des armoires' : '⤓ Télécharger les photos des points lumineux';
+  $('#btn-zip').innerHTML = `⤓ Télécharger les photos<span class="lbl-long"> des ${t === 'armoires' ? 'armoires' : 'points lumineux'}</span>`;
   document.querySelectorAll('[data-type]').forEach(b => b.classList.toggle('active', b.dataset.type === t));
   apply();
 }
@@ -586,8 +607,8 @@ const TOURS = {
     { el: '.navbar .seg', title: 'Armoires ou points lumineux', text: 'Choisissez le type d’élément à consulter. Le nombre d’éléments est indiqué sur chaque onglet. Les filtres et le téléchargement s’appliquent au type sélectionné.' },
     { el: '.navbar .seg:nth-of-type(2)', title: 'Liste ou carte', text: 'Basculez entre le tableau et la carte de Meknès. Sur la carte, cliquez sur un point pour voir ses photos.' },
     { el: '#q', title: 'Rechercher', text: 'Recherche dans les colonnes du tableau : FID, code d’armoire, rue / localisation, modèle de luminaire…' },
-    { el: '#f-armoire', title: 'Filtrer par armoire', text: 'Sélectionnez une armoire pour n’afficher que ses points lumineux. <b>C’est la meilleure façon de préparer un téléchargement par secteur.</b>' },
-    { el: '#btn-filter', title: 'Filtrer par colonne', text: 'Ajoutez des conditions sur les colonnes du tableau (modèle, puissance, hauteur, localisation, code, état…). Les filtres se cumulent et s’affichent sous la barre ; un clic sur ✕ les retire.' },
+    { el: '#f-armoire', before: openMoreIfMobile, title: 'Filtrer par armoire', text: 'Sélectionnez une armoire pour n’afficher que ses points lumineux. <b>C’est la meilleure façon de préparer un téléchargement par secteur.</b>' },
+    { el: '#btn-filter', before: openMoreIfMobile, title: 'Filtrer par colonne', text: 'Ajoutez des conditions sur les colonnes du tableau (modèle, puissance, hauteur, localisation, code, état…). Les filtres se cumulent et s’affichent sous la barre ; un clic sur ✕ les retire.' },
     { el: '#summary', title: 'Votre sélection', text: 'Nombre d’éléments et de photos correspondant aux filtres. <b>C’est exactement ce qui sera téléchargé.</b>' },
     { el: () => S.view === 'list' ? document.querySelector('#tbl tbody tr') : null, title: 'Ouvrir une fiche', text: 'Cliquez sur une ligne pour ouvrir la fiche : photos classées par type, agrandissement plein écran, informations, lien vers l’armoire ou ses points lumineux.' },
     { el: '#btn-zip', title: 'Télécharger les photos', text: 'Prépare les photos de la sélection en <b>lots ZIP de 1 à 2 Go</b>, à télécharger un par un. Chaque ZIP est rangé par armoire puis par point lumineux.' },
@@ -623,14 +644,14 @@ function contextTour(force) {
   if ($('#batches').open) return Tour.run('batches', TOURS.batches(), { force, title: 'Téléchargement' });
   if (!$('#detail').classList.contains('hidden')) return Tour.run('detail', TOURS.detail(), { force, title: 'Fiche' });
   if (S.view === 'map') return Tour.run('map', TOURS.map(), { force, title: 'Carte' });
-  return Tour.run('main', TOURS.main(), { force, title: 'Prise en main' });
+  return Tour.run('main', TOURS.main(), { force, title: 'Prise en main', onClose: () => setMore(false) });
 }
 $('#btn-help').addEventListener('click', () => { track('help_open', { ecran: $('#batches').open ? 'batches' : S.view }); contextTour(true); });
 $('#d-help').addEventListener('click', () => Tour.run('detail', TOURS.detail(), { force: true, title: 'Fiche' }));
 $('#b-help').addEventListener('click', () => Tour.run('batches', TOURS.batches(), { force: true, title: 'Téléchargement' }));
 $('#directives-body').innerHTML = DIRECTIVES;
 $('#btn-directives').addEventListener('click', () => { $('#directives').showModal(); track('help_open', { ecran: 'directives' }); });
-$('#dir-tour').addEventListener('click', () => { $('#directives').close(); S.view === 'list' || document.querySelector('[data-view=list]').click(); Tour.run('main', TOURS.main(), { force: true, title: 'Prise en main' }); });
+$('#dir-tour').addEventListener('click', () => { $('#directives').close(); S.view === 'list' || document.querySelector('[data-view=list]').click(); Tour.run('main', TOURS.main(), { force: true, title: 'Prise en main', onClose: () => setMore(false) }); });
 
 track('visit', { ecran: `${screen.width}x${screen.height}`, langue: navigator.language, provenance: document.referrer || '' });
 loadData();

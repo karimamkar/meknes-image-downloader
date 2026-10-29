@@ -2,7 +2,8 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
 <title>SDAL Meknès — Photothèque de l'éclairage public</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -25,26 +26,31 @@
 <nav class="navbar">
   <div class="seg" role="tablist" aria-label="Type d'élément">
     <button class="seg-btn active" data-type="armoires"><span class="dot arm"></span>Armoires <b id="cnt-armoires">–</b></button>
-    <button class="seg-btn" data-type="pl"><span class="dot pl"></span>Points lumineux <b id="cnt-pl">–</b></button>
+    <button class="seg-btn" data-type="pl"><span class="dot pl"></span><span class="lbl-long">Points lumineux</span><span class="lbl-short">Points</span> <b id="cnt-pl">–</b></button>
   </div>
   <div class="seg" aria-label="Affichage">
-    <button class="seg-btn view active" data-view="list">☰ Liste</button>
-    <button class="seg-btn view" data-view="map">◎ Carte</button>
+    <button class="seg-btn view active" data-view="list" aria-label="Liste">☰<span class="lbl-long"> Liste</span></button>
+    <button class="seg-btn view" data-view="map" aria-label="Carte">◎<span class="lbl-long"> Carte</span></button>
   </div>
   <div class="spacer"></div>
-  <button id="btn-directives" class="btn" title="Directives d'utilisation pour les agents SRM">📋 Directives SRM</button>
-  <button id="btn-help" class="btn primary" title="Afficher le guide de cet écran">? Guide</button>
+  <button id="btn-directives" class="btn" title="Directives d'utilisation pour les agents SRM" aria-label="Directives SRM">📋<span class="lbl-long"> Directives SRM</span></button>
+  <button id="btn-help" class="btn primary" title="Afficher le guide de cet écran" aria-label="Guide">?<span class="lbl-long"> Guide</span></button>
 </nav>
 
-<section class="toolbar">
-  <div class="search"><input id="q" type="search" placeholder="Rechercher : FID, code, localisation, modèle…"></div>
-  <select id="f-armoire"><option value="">Toutes les armoires</option></select>
-  <label class="chk"><input type="checkbox" id="f-photos"> Avec photos</label>
-  <button id="btn-filter" class="btn">⧩ Filtrer par colonne</button>
-  <div class="stats" id="summary"></div>
-  <div class="spacer"></div>
-  <button id="btn-links" class="btn">Liens (.txt)</button>
-  <button id="btn-zip" class="btn primary">⤓ Télécharger les photos des armoires</button>
+<section class="toolbar" id="toolbar">
+  <div class="search"><input id="q" type="search" enterkeyhint="search" placeholder="Rechercher : FID, code, localisation, modèle…"></div>
+  <button id="btn-more" class="btn mobile-only" aria-expanded="false" aria-controls="more">⧩ Filtres<b id="more-count"></b></button>
+  <div class="more" id="more">
+    <select id="f-armoire"><option value="">Toutes les armoires</option></select>
+    <label class="chk"><input type="checkbox" id="f-photos"> Avec photos</label>
+    <button id="btn-filter" class="btn">⧩ Filtrer par colonne</button>
+  </div>
+  <div class="actions">
+    <div class="stats" id="summary"></div>
+    <div class="spacer"></div>
+    <button id="btn-links" class="btn">Liens<span class="lbl-long"> (.txt)</span></button>
+    <button id="btn-zip" class="btn primary">⤓ Télécharger les photos<span class="lbl-long"> des armoires</span></button>
+  </div>
 </section>
 <div id="chips" class="chips hidden"></div>
 
