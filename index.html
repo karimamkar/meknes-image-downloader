@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIG Meknès — Photos</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">SIG Meknès <span>· photos</span></div>
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-type="armoires">Armoires <b id="cnt-armoires">0</b></button>
+    <button class="tab" data-type="pl">Points lumineux <b id="cnt-pl">0</b></button>
+  </nav>
+  <nav class="views">
+    <button class="view active" data-view="list">Liste</button>
+    <button class="view" data-view="map">Carte</button>
+  </nav>
+  <button id="btn-settings" class="ghost" title="Paramètres">⚙ Paramètres</button>
+</header>
+
+<section class="toolbar">
+  <input id="q" type="search" placeholder="Rechercher (FID, code, localisation, modèle…)">
+  <select id="f-armoire"><option value="">Toutes les armoires</option></select>
+  <label class="chk"><input type="checkbox" id="f-photos"> Avec photos seulement</label>
+  <span id="summary" class="muted"></span>
+  <div class="spacer"></div>
+  <div class="dl-group">
+    <span class="muted">Sélection filtrée :</span>
+    <button id="btn-links" class="ghost">Liste des liens (.txt)</button>
+    <button id="btn-script" class="ghost">Script PowerShell</button>
+    <button id="btn-zip" class="primary">Télécharger (ZIP)</button>
+  </div>
+</section>
+
+<main>
+  <div id="list-view" class="pane">
+    <table id="tbl"><thead></thead><tbody></tbody></table>
+    <div id="pager" class="pager"></div>
+  </div>
+  <div id="map-view" class="pane hidden"><div id="map"></div></div>
+</main>
+
+<aside id="detail" class="drawer hidden" aria-live="polite">
+  <div class="drawer-head">
+    <h2 id="d-title"></h2>
+    <div>
+      <button id="d-zip" class="primary small">ZIP de cet élément</button>
+      <button id="d-close" class="ghost small">✕</button>
+    </div>
+  </div>
+  <div id="d-body"></div>
+</aside>
+
+<div id="lightbox" class="lightbox hidden">
+  <button class="lb-nav" id="lb-prev">‹</button>
+  <figure><img id="lb-img" alt=""><figcaption id="lb-cap"></figcaption></figure>
+  <button class="lb-nav" id="lb-next">›</button>
+  <button class="lb-close" id="lb-close">✕</button>
+</div>
+
+<dialog id="settings">
+  <form method="dialog">
+    <h3>Paramètres</h3>
+    <label>URL des images
+      <input id="s-base" placeholder="https://serveur/photos/{file}">
+      <small><code>{file}</code> est remplacé par le nom de la photo. Sans <code>{file}</code>, le nom est ajouté à la fin.</small>
+    </label>
+    <label>Fichier armoires (.xlsx / .csv)<input type="file" id="s-file-arm" accept=".xlsx,.xls,.csv"></label>
+    <label>Fichier points lumineux (.xlsx / .csv)<input type="file" id="s-file-pl" accept=".xlsx,.xls,.csv"></label>
+    <label>Téléchargements simultanés (ZIP)<input id="s-conc" type="number" min="1" max="16" value="6"></label>
+    <menu><button value="ok" class="primary">Enregistrer</button></menu>
+  </form>
+</dialog>
+
+<footer class="foot">
+  <img src="assets/logo-srm-fes-meknes.png" alt="Société Régionale Multiservices Fès-Meknès SA">
+  <img src="assets/logo-cetener.png" alt="CETENER">
+</footer>
+
+<div id="progress" class="progress hidden"><div class="bar"><i></i></div><span></span><button id="p-cancel" class="ghost small">Annuler</button></div>
+<div id="toast" class="toast hidden"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
