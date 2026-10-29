@@ -1,6 +1,24 @@
 name = "meknes-image-downloader"
+main = "src/worker.js"
 compatibility_date = "2026-10-01"
 
 [assets]
 directory = "./public"
-not_found_handling = "single-page-application"
+binding = "ASSETS"
+# Le Worker passe en premier pour l'API et l'administration ; le reste est servi directement.
+run_worker_first = ["/api/*", "/admin", "/admin/*"]
+
+# Registre des opérations : Durable Object avec stockage SQLite (créé au déploiement)
+[[durable_objects.bindings]]
+name = "AUDIT"
+class_name = "AuditLog"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AuditLog"]
+
+[vars]
+# Empreinte SHA-256 de la clé d'administration (la clé elle-même n'est stockée nulle part).
+# Pour changer de clé : générer une nouvelle clé longue, remplacer cette empreinte, redéployer.
+# Option plus discrète : supprimer cette ligne et définir ADMIN_KEY_HASH comme secret dans Cloudflare.
+ADMIN_KEY_HASH = "6bfd5ae62802934ee6f62bd301b433fffb957c8b09204496c5f87c8e2ceb8cbc"

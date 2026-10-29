@@ -1,0 +1,25 @@
+body{min-height:100%;overflow:auto;display:block}
+.login{display:flex;justify-content:center;padding:60px 16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px;width:min(440px,100%);box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px}
+.card h2{margin:0;font-size:18px}
+.card p{margin:0}
+.err{color:var(--warn);min-height:1.2em;font-size:13px}
+.admin .toolbar label{display:flex;gap:6px;align-items:center;color:var(--muted)}
+#f-q{min-width:220px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;padding:16px 24px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.kpi b{display:block;font-size:22px}
+.kpi span{color:var(--muted);font-size:12px}
+.kpi.alert b{color:var(--warn)}
+.admin-main{padding:0 24px 24px}
+.admin-main table{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.admin-main td{white-space:normal;vertical-align:top;font-size:13px}
+.admin-main td.nw{white-space:nowrap}
+.admin-main td.detail{max-width:420px;word-break:break-word;color:var(--muted)}
+.admin-main td.ua{max-width:260px;font-size:12px;color:var(--muted)}
+.tag{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--soft);font-size:12px;font-weight:600;white-space:nowrap}
+.tag.dl{background:color-mix(in srgb,var(--accent) 18%,var(--panel));color:var(--accent)}
+.tag.sec{background:color-mix(in srgb,var(--warn) 15%,var(--panel));color:var(--warn)}
+a.ip{color:var(--accent);cursor:pointer;text-decoration:none}
+a.btn{text-decoration:none;color:inherit}
+.admin-main tbody tr{cursor:default}

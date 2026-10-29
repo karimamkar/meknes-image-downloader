@@ -42,6 +42,15 @@ const typeName = t => t === 'armoires' ? 'Armoires' : 'Points lumineux';
 
 const photoUrl = file => IMAGE_BASE + encodeURIComponent(file);
 
+/* ---------- Registre des opérations (envoyé au Worker, IP relevée côté serveur) ---------- */
+const rid = () => (crypto.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now().toString(36));
+const VISITOR = (() => { let v = load('visitor', ''); if (!v) { v = rid(); save('visitor', v); } return v; })();
+const SESSION = (() => { try { let v = sessionStorage.getItem('sig.session'); if (!v) { v = rid(); sessionStorage.setItem('sig.session', v); } return v; } catch { return rid(); } })();
+function track(type, detail = {}) {
+  const body = JSON.stringify({ type, detail, visitor: VISITOR, session: SESSION });
+  try { fetch('/api/log', { method: 'POST', headers: { 'content-type': 'application/json' }, body, keepalive: true, credentials: 'same-origin' }).catch(() => {}); } catch {}
+}
+
 /* ---------- Données ---------- */
 function splitPhotos(v) { return empty(v) ? [] : (String(v).match(PHOTO_RE) || []); }
 
@@ -218,6 +227,7 @@ function renderMap() {
 /* ---------- Détail ---------- */
 function openDetail(i) {
   const e = S.filtered[i]; if (!e) return;
+  track('detail_open', { type: e.type, id: e.id, photos: e.photos.length });
   S.current = e;
   $('#d-kind').textContent = e.type === 'armoires' ? 'Armoire' : 'Point lumineux';
   $('#d-title').textContent = e.label;
@@ -285,6 +295,7 @@ const prefix = () => (S.type === 'armoires' ? 'armoires' : 'points_lumineux') + 
 function exportLinks(elements = S.filtered, name = `${prefix()}_liens.txt`) {
   const j = jobs(elements); if (!j.length) return toast('Aucune photo dans la sélection.');
   saveBlob(new Blob([j.map(x => x.url).join('\n') + '\n'], { type: 'text/plain' }), name);
+  track('links_export', { type: S.type, fichier: name, liens: j.length });
 }
 
 /* ---------- Lots de 1 à 2 Go ---------- */
@@ -334,6 +345,7 @@ async function openBatches() {
   $('#batches').showModal();
   if (!S.avgSize) { const m = await measureAvgSize(S.filtered); S.avgSize = m.avg; S.avgMeasured = m.measured; }
   S.batches = buildBatches(S.filtered, S.avgSize);
+  track('batch_plan', { type: S.type, elements: S.filtered.length, lots: S.batches.length, filtres: describeFilters() });
   const tot = S.batches.reduce((s, b) => s + b.bytes, 0), ph = S.batches.reduce((s, b) => s + b.photos, 0);
   $('#b-info').textContent = `${typeName(S.type)} · ${fmt(ph)} photos · ≈ ${fmtSize(tot)} · ${S.batches.length} lot(s)`;
   $('#b-note').textContent = window.showSaveFilePicker ? '' : 'Pour les lots de plus de 1 Go, utilisez de préférence Chrome ou Edge.';
@@ -397,6 +409,7 @@ async function runBatch(i) {
   if (b.state === 'run') { b.ctl?.abort(); return; }
   const list = jobs(b.elements);
   b.ctl = new AbortController(); b.state = 'run'; b.pct = 0; b.msg = 'Démarrage…'; renderBatches();
+  track('batch_start', { lot: b.name, elements: b.elements.length, photos: b.photos, taille_estimee_mo: Math.round(b.bytes / 1048576) });
   try {
     const r = await zipToFile(list, b.name, (d, t, e) => {
       b.pct = d * 100 / t; b.msg = `${fmt(d)} / ${fmt(t)} photos${e ? ` · ${e} erreur(s)` : ''}`; updateBatch(i);
@@ -407,12 +420,14 @@ async function runBatch(i) {
     b.state = 'err'; b.msg = err.name === 'AbortError' ? 'Annulé.' : 'Erreur : ' + err.message;
   }
   b.pct = b.state === 'done' ? 100 : b.pct; renderBatches();
+  track('batch_end', { lot: b.name, etat: b.state, message: b.msg });
 }
 
 async function zipCurrent() {
   const e = S.current; if (!e?.photos.length) return toast('Aucune photo pour cet élément.');
   const btn = $('#d-zip'); btn.disabled = true;
   try {
+    track('zip_element', { type: e.type, id: e.id, photos: e.photos.length });
     const r = await zipToFile(jobs([e]), `${e.type === 'armoires' ? 'armoire' : 'PL'}_${e.id}.zip`,
       (d, t) => { btn.textContent = `${d}/${t}`; }, new AbortController().signal, false);
     toast(r.errors === r.done ? 'Photos inaccessibles depuis le navigateur (CORS).' : `ZIP prêt${r.errors ? ` · ${r.errors} erreur(s)` : ''}.`);
@@ -428,6 +443,7 @@ function toast(msg, ms = 4000) {
 
 /* ---------- Événements ---------- */
 function setType(t) {
+  if (t !== S.type) track('type', { type: t });
   S.type = t; S.page = 0; S.avgSize = null; S.filters = [];
   $('#btn-zip').textContent = t === 'armoires' ? '⤓ Télécharger les photos des armoires' : '⤓ Télécharger les photos des points lumineux';
   document.querySelectorAll('[data-type]').forEach(b => b.classList.toggle('active', b.dataset.type === t));
@@ -435,14 +451,15 @@ function setType(t) {
 }
 document.querySelectorAll('[data-type]').forEach(b => b.addEventListener('click', () => setType(b.dataset.type)));
 document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
-  S.view = b.dataset.view;
+  S.view = b.dataset.view; track('view', { vue: S.view, type: S.type });
   document.querySelectorAll('[data-view]').forEach(x => x.classList.toggle('active', x === b));
   $('#list-view').classList.toggle('hidden', S.view !== 'list');
   $('#map-view').classList.toggle('hidden', S.view !== 'map');
   render();
 }));
-let qT; $('#q').addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(() => { S.page = 0; S.avgSize = null; apply(); }, 250); });
-$('#f-armoire').addEventListener('change', () => { S.page = 0; apply(); });
+let qT; $('#q').addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(() => { S.page = 0; S.avgSize = null; apply(); }, 250); clearTimeout(qT2); qT2 = setTimeout(() => { const v = $('#q').value.trim(); if (v.length >= 2) track('search', { texte: v.slice(0, 100), type: S.type, resultats: S.filtered.length }); }, 1500); });
+let qT2;
+$('#f-armoire').addEventListener('change', () => { S.page = 0; apply(); if ($('#f-armoire').value) track('armoire_select', { armoire: $('#f-armoire').value, type: S.type }); });
 $('#f-photos').addEventListener('change', () => { S.page = 0; apply(); });
 $('#tbl tbody').addEventListener('click', ev => { const tr = ev.target.closest('tr[data-i]'); if (tr) openDetail(+tr.dataset.i); });
 $('#pager').addEventListener('click', ev => { const b = ev.target.closest('[data-p]'); if (b) { S.page = +b.dataset.p; renderList(); $('#list-view').scrollTop = 0; } });
@@ -514,18 +531,27 @@ $('#fdlg form').addEventListener('submit', ev => {
   const op = $('#fc-op').value, val = $('#fc-val').value.trim();
   if (!['empty', 'filled'].includes(op) && !val) { ev.preventDefault(); $('#fc-val').focus(); return; }
   S.filters.push({ col: $('#fc-col').value, op, val });
+  track('filter_add', { type: S.type, colonne: $('#fc-col').value, condition: OPS[op], valeur: val });
   S.page = 0; S.avgSize = null; apply();
 });
 $('#chips').addEventListener('click', ev => {
   const b = ev.target.closest('[data-rm]'); if (!b) return;
   b.dataset.rm === 'all' ? (S.filters = []) : S.filters.splice(+b.dataset.rm, 1);
+  track('filter_clear', { type: S.type, restants: S.filters.length });
   S.page = 0; S.avgSize = null; apply();
 });
 
 /* ---------- Aide (premier usage) ---------- */
-function openHelp() { $('#help').showModal(); }
+function openHelp() { $('#help').showModal(); track('help_open'); }
+const describeFilters = () => [
+  $('#q').value.trim() && `recherche « ${$('#q').value.trim()} »`,
+  $('#f-armoire').value && `armoire ${$('#f-armoire').value}`,
+  $('#f-photos').checked && 'avec photos',
+  ...S.filters.map(f => `${f.col} ${OPS[f.op]} ${f.val}`),
+].filter(Boolean).join(' ; ');
 $('#btn-help').addEventListener('click', openHelp);
 $('#help').addEventListener('close', () => save('help.v1', '1'));
 
+track('visit', { ecran: `${screen.width}x${screen.height}`, langue: navigator.language, provenance: document.referrer || '' });
 loadData();
 })();

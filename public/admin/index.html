@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Registre — SDAL Meknès</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css">
+<link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+<header class="masthead">
+  <img class="logo" src="/assets/logo-srm-fes-meknes.png" alt="Société Régionale Multiservices Fès-Meknès SA">
+  <div class="title">
+    <h1>SDAL de la ville de Meknès</h1>
+    <p>Registre des opérations et des connexions — accès réservé</p>
+  </div>
+  <img class="logo" src="/assets/logo-cetener.png" alt="CETENER">
+</header>
+
+<section id="login" class="login hidden">
+  <form id="login-form" class="card" autocomplete="off">
+    <h2>Accès administrateur</h2>
+    <p class="muted">Saisissez la clé d'administration.</p>
+    <input id="key" type="password" autocomplete="current-password" placeholder="Clé d'administration" required minlength="32" maxlength="256" spellcheck="false">
+    <button class="btn primary" id="login-btn">Se connecter</button>
+    <p id="login-err" class="err"></p>
+  </form>
+</section>
+
+<section id="app" class="admin hidden">
+  <nav class="navbar">
+    <div class="seg">
+      <button class="seg-btn active" data-tab="events">Journal des opérations</button>
+      <button class="seg-btn" data-tab="sessions">Historique des connexions</button>
+    </div>
+    <div class="spacer"></div>
+    <a class="btn" href="/">← Application</a>
+    <button class="btn" id="logout">Se déconnecter</button>
+  </nav>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section class="toolbar">
+    <label>Du <input type="date" id="f-from"></label>
+    <label>au <input type="date" id="f-to"></label>
+    <select id="f-type"><option value="">Toutes les opérations</option></select>
+    <input id="f-ip" placeholder="Adresse IP" size="16">
+    <input id="f-q" type="search" placeholder="Recherche (détail, ville, navigateur…)">
+    <button class="btn" id="f-reset">Réinitialiser</button>
+    <div class="spacer"></div>
+    <button class="btn primary" id="export">Exporter (CSV)</button>
+  </section>
+
+  <main class="admin-main">
+    <table id="tbl"><thead></thead><tbody></tbody></table>
+    <div class="pager" id="pager"></div>
+  </main>
+</section>
+
+<script src="/admin/admin.js"></script>
+</body>
+</html>
