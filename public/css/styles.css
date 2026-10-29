@@ -25,6 +25,7 @@ input:focus,select:focus{outline:2px solid color-mix(in srgb,var(--accent) 40%,t
 .masthead .title{text-align:center}
 .masthead h1{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em}
 .masthead p{margin:2px 0 0;color:#667085;font-size:13px}
+.masthead .credit{font-size:12px;color:#0e7490}
 
 .navbar{display:flex;align-items:center;gap:12px;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
 .seg{display:inline-flex;background:var(--soft);border-radius:10px;padding:3px;gap:2px}
@@ -37,8 +38,8 @@ input:focus,select:focus{outline:2px solid color-mix(in srgb,var(--accent) 40%,t
 .icon-btn:hover{background:var(--soft)}
 
 .toolbar{display:flex;align-items:center;gap:10px;padding:10px 24px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--panel)}
-.search{flex:0 1 360px;min-width:220px}.search input{width:100%}
-#f-armoire{max-width:260px}
+.search{flex:0 1 300px;min-width:200px}.search input{width:100%}
+#f-armoire{max-width:220px}
 .chk{display:flex;gap:6px;align-items:center;color:var(--muted)}
 .stats{color:var(--muted);font-size:13px}.stats b{color:var(--ink)}
 .btn{border:1px solid var(--line);background:var(--panel);padding:8px 14px;border-radius:8px;font-weight:500}
@@ -129,3 +130,15 @@ td.thumbs img{width:44px;height:44px;object-fit:cover;border-radius:6px;backgrou
   .navbar,.toolbar{padding:8px 12px}
   .search{flex:1 1 100%}
 }
+
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+.chip{display:inline-flex;align-items:center;gap:6px;background:color-mix(in srgb,var(--accent) 12%,var(--panel));border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));border-radius:999px;padding:3px 4px 3px 12px;font-size:13px}
+.chip button{border:0;background:transparent;width:22px;height:22px;border-radius:50%;color:var(--muted)}
+.chip button:hover{background:var(--soft);color:var(--ink)}
+button.link{border:0;background:transparent;color:var(--accent);font-size:13px;text-decoration:underline}
+.modal menu{gap:8px}
+.steps{padding-left:20px;margin:16px 0 0}
+.steps li{margin:0 0 10px;line-height:1.55}
+.map-mode{background:var(--panel);color:var(--ink);padding:8px 10px;font-size:13px}
+.map-mode label{display:flex;gap:6px;align-items:center;margin:0;font-weight:500;cursor:pointer}
+.map-mode small{display:block;color:var(--muted);margin-top:2px}

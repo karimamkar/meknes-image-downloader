@@ -2,14 +2,16 @@
 (() => {
 'use strict';
 
-const DEFAULT_BASE = 'https://streetlighting-audit.lon1.digitaloceanspaces.com/photos/';
+const IMAGE_BASE = 'https://streetlighting-audit.lon1.digitaloceanspaces.com/photos/';
+const CONCURRENCY = 6;                    // téléchargements simultanés
+const CLUSTER_UNTIL_ZOOM = 16;            // au-delà : tous les points affichés sans regroupement
+const MEKNES_CENTER = [33.89, -5.55];
 const PAGE = 100;
 const PHOTO_RE = /[^\s,;]+\.(?:jpe?g|png|webp|heic)/gi;
 const GB = 1024 ** 3;
 const BATCH_TARGET = 1.5 * GB;            // lots visés entre 1 et 2 Go
 const DEFAULT_PHOTO_SIZE = 400 * 1024;    // si la taille réelle ne peut pas être mesurée
 const CLIENT_ZIP = 'https://cdn.jsdelivr.net/npm/client-zip@2.4.5/index.js';
-const SHEETJS = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 
 const PHOTO_COLS = {
   armoires: { 'Photos extérieures': 'exterieur', 'Photos intérieures': 'interieur' },
@@ -23,8 +25,8 @@ const LIST_COLS = {
 const S = {
   type: 'armoires', view: 'list', page: 0,
   data: { armoires: [], pl: [] }, filtered: [],
-  base: load('base.v2', DEFAULT_BASE), conc: +load('conc', 6),
-  map: null, cluster: null, mapDirty: true, current: null, lb: { list: [], i: 0 },
+  cols: { armoires: [], pl: [] }, filters: [],
+  map: null, cluster: null, flat: null, markers: [], mapMode: load('mapmode', 'auto'), mapDirty: true, current: null, lb: { list: [], i: 0 },
   batches: [], avgSize: null, avgMeasured: false,
 };
 
@@ -38,10 +40,7 @@ const fmt = n => n.toLocaleString('fr');
 const fmtSize = b => b >= GB ? (b / GB).toFixed(2).replace('.', ',') + ' Go' : Math.round(b / 1048576) + ' Mo';
 const typeName = t => t === 'armoires' ? 'Armoires' : 'Points lumineux';
 
-function photoUrl(file) {
-  const b = S.base.trim();
-  return b.includes('{file}') ? b.replace('{file}', encodeURIComponent(file)) : b.replace(/\/?$/, '/') + encodeURIComponent(file);
-}
+const photoUrl = file => IMAGE_BASE + encodeURIComponent(file);
 
 /* ---------- Données ---------- */
 function splitPhotos(v) { return empty(v) ? [] : (String(v).match(PHOTO_RE) || []); }
@@ -73,21 +72,23 @@ async function loadData() {
     const man = await fetch('data/manifest.json').then(r => r.json());
     for (const type of ['armoires', 'pl']) {
       const parts = await Promise.all(man[type].map(f => fetch('data/' + f).then(r => { if (!r.ok) throw new Error(f); return r.json(); })));
-      setData(type, parts.flatMap(fromColumns), true);
+      const photoCols = Object.keys(PHOTO_COLS[type]);
+      S.cols[type] = parts[0].cols.filter(c => !photoCols.includes(c) && !['latitude','longitude','Armoire_latitude','Armoire_longitude'].includes(c));
+      setData(type, parts.flatMap(fromColumns));
     }
   } catch (e) {
     toast('Chargement de l’inventaire impossible : ' + e.message, 8000);
   }
   $('#loading').classList.add('hidden');
+  if (!load('help.v1', '')) openHelp();
 }
 
-function setData(type, rows, quiet) {
+function setData(type, rows) {
   S.data[type] = normalize(type, rows);
   $('#cnt-' + type).textContent = fmt(S.data[type].length);
   if (type === 'armoires') fillArmoireFilter();
   S.mapDirty = true; S.page = 0; S.avgSize = null;
   apply();
-  if (!quiet) toast(`${typeName(type)} : ${fmt(rows.length)} lignes chargées.`);
 }
 
 function fillArmoireFilter() {
@@ -102,8 +103,11 @@ function apply() {
   const q = $('#q').value.trim().toLowerCase();
   const arm = $('#f-armoire').value;
   const onlyPh = $('#f-photos').checked;
+  const fl = S.filters;
   S.filtered = S.data[S.type].filter(e =>
-    (!arm || String(e.armoire) === arm) && (!onlyPh || e.photos.length) && (!q || e.text.includes(q)));
+    (!arm || String(e.armoire) === arm) && (!onlyPh || e.photos.length) && (!q || e.text.includes(q)) &&
+    fl.every(f => matchFilter(e.raw[f.col], f)));
+  renderChips();
   const n = S.filtered.reduce((s, e) => s + e.photos.length, 0);
   $('#summary').innerHTML = `<b>${fmt(S.filtered.length)}</b> éléments · <b>${fmt(n)}</b> photos`;
   S.mapDirty = true;
@@ -129,35 +133,86 @@ function renderList() {
 }
 
 /* ---------- Carte ---------- */
+function cityBounds() {
+  // Emprise de Meknès calculée sur l'inventaire (points aberrants à plus de 0,4° du centre ignorés)
+  let s = 90, w = 180, n = -90, e = -180;
+  [...S.data.armoires, ...S.data.pl].forEach(p => {
+    if (!isFinite(p.lat) || !isFinite(p.lng) || Math.abs(p.lat - MEKNES_CENTER[0]) > .4 || Math.abs(p.lng - MEKNES_CENTER[1]) > .4) return;
+    s = Math.min(s, p.lat); n = Math.max(n, p.lat); w = Math.min(w, p.lng); e = Math.max(e, p.lng);
+  });
+  return s < n ? L.latLngBounds([s, w], [n, e]) : L.latLngBounds([33.80, -5.65], [33.98, -5.42]);
+}
+
 function initMap() {
-  S.map = L.map('map', { preferCanvas: true }).setView([33.89, -5.55], 13);
-  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20, maxNativeZoom: 19, attribution: '© OpenStreetMap' });
-  const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19, attribution: '© Esri' });
+  const city = cityBounds(), limit = city.pad(0.1);
+  S.renderer = L.canvas({ padding: 0.3, tolerance: 4 });
+  S.map = L.map('map', { renderer: S.renderer, maxBounds: limit, maxBoundsViscosity: 1, maxZoom: 20, zoomSnap: 0.5 });
+  S.map.fitBounds(city);
+  S.map.setMinZoom(Math.max(11, Math.floor(S.map.getBoundsZoom(city) * 2) / 2));
+  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20, maxNativeZoom: 19, bounds: limit, attribution: '© OpenStreetMap' });
+  const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19, bounds: limit, attribution: '© Esri' });
   osm.addTo(S.map);
   L.control.layers({ 'Plan': osm, 'Satellite': sat }).addTo(S.map);
-  S.cluster = L.markerClusterGroup({ chunkedLoading: true, disableClusteringAtZoom: 18, maxClusterRadius: 50 });
-  S.map.addLayer(S.cluster);
+
+  S.cluster = L.markerClusterGroup({
+    chunkedLoading: true, disableClusteringAtZoom: CLUSTER_UNTIL_ZOOM, maxClusterRadius: 60,
+    spiderfyOnMaxZoom: false, showCoverageOnHover: false, removeOutsideVisibleBounds: true,
+  });
+  S.flat = L.layerGroup();
+  const onClick = ev => showPopup(ev.layer);
+  S.cluster.on('click', onClick); S.flat.on('click', onClick);
+
+  const ModeCtl = L.Control.extend({
+    onAdd() {
+      const d = L.DomUtil.create('div', 'leaflet-bar map-mode');
+      d.innerHTML = `<label><input type="checkbox" ${S.mapMode === 'all' ? 'checked' : ''}> Tous les points (sans regroupement)</label>
+        <small>Regroupement automatique jusqu'au zoom ${CLUSTER_UNTIL_ZOOM}</small>`;
+      L.DomEvent.disableClickPropagation(d);
+      d.querySelector('input').addEventListener('change', ev => { S.mapMode = ev.target.checked ? 'all' : 'auto'; save('mapmode', S.mapMode); placeMarkers(); });
+      return d;
+    },
+  });
+  new ModeCtl({ position: 'topleft' }).addTo(S.map);
 }
+
+function buildMarkers() {
+  const arm = S.type === 'armoires';
+  const style = arm
+    ? { renderer: S.renderer, radius: 6.5, weight: 1.5, color: '#7c2d12', fillColor: '#ea580c', fillOpacity: .95 }
+    : { renderer: S.renderer, radius: 4, weight: 1, color: '#155e75', fillColor: '#06b6d4', fillOpacity: .9 };
+  S.markers = [];
+  S.filtered.forEach((e, i) => {
+    if (!isFinite(e.lat) || !isFinite(e.lng)) return;
+    const m = L.circleMarker([e.lat, e.lng], style); m._i = i;
+    S.markers.push(m);
+  });
+}
+
+function placeMarkers() {
+  S.cluster.clearLayers(); S.flat.clearLayers();
+  S.map.removeLayer(S.cluster); S.map.removeLayer(S.flat);
+  if (S.mapMode === 'all') { S.markers.forEach(m => S.flat.addLayer(m)); S.flat.addTo(S.map); }
+  else { S.cluster.addLayers(S.markers); S.cluster.addTo(S.map); }
+}
+
+function showPopup(m) {
+  const i = m._i, e = S.filtered[i]; if (!e) return;
+  L.popup({ minWidth: 220, offset: [0, -4] }).setLatLng(m.getLatLng()).setContent(
+    `<b>${esc(e.label)}</b><br><span class="muted">${e.photos.length} photo(s)</span>
+     <div class="popup-thumbs">${e.photos.slice(0, 3).map(p => `<img src="${esc(photoUrl(p.file))}" alt="">`).join('')}</div>
+     <button onclick="window.__open(${i})">Voir le détail</button>`).openOn(S.map);
+}
+
 function renderMap() {
   if (!S.map) initMap();
   setTimeout(() => S.map.invalidateSize(), 0);
   if (!S.mapDirty) return;
   S.mapDirty = false;
-  S.cluster.clearLayers();
-  const icon = S.type === 'armoires'
-    ? L.divIcon({ className: 'mk-arm', iconSize: [13, 13] })
-    : L.divIcon({ className: 'mk-pl', iconSize: [12, 12] });
-  const markers = [];
-  S.filtered.forEach((e, i) => {
-    if (!isFinite(e.lat) || !isFinite(e.lng)) return;
-    const m = L.marker([e.lat, e.lng], { icon });
-    m.bindPopup(() => `<b>${esc(e.label)}</b><br><span class="muted">${e.photos.length} photo(s)</span>
-      <div class="popup-thumbs">${e.photos.slice(0, 3).map(p => `<img src="${esc(photoUrl(p.file))}" alt="">`).join('')}</div>
-      <button onclick="window.__open(${i})">Voir le détail</button>`, { minWidth: 220 });
-    markers.push(m);
-  });
-  S.cluster.addLayers(markers);
-  if (markers.length) S.map.fitBounds(S.cluster.getBounds(), { maxZoom: 18, padding: [20, 20] });
+  S.map.closePopup();
+  buildMarkers(); placeMarkers();
+  if (S.markers.length && S.filtered.length < S.data[S.type].length) {
+    S.map.fitBounds(L.latLngBounds(S.markers.map(m => m.getLatLng())), { maxZoom: 18, padding: [30, 30] });
+  }
 }
 
 /* ---------- Détail ---------- */
@@ -274,18 +329,15 @@ async function openBatches() {
   if (!S.filtered.some(e => e.photos.length)) return toast('Aucune photo dans la sélection.');
   $('#b-info').textContent = `${typeName(S.type)} · ${fmt(S.filtered.length)} éléments · mesure de la taille des photos…`;
   $('#b-list').innerHTML = '<div class="loading" style="position:static;height:120px"><div class="spinner"></div></div>';
-  $('#b-note').textContent = '';
+  $('#b-note').classList.add('hidden');
+  $('#b-title').textContent = S.type === 'armoires' ? 'Photos des armoires' : 'Photos des points lumineux';
   $('#batches').showModal();
   if (!S.avgSize) { const m = await measureAvgSize(S.filtered); S.avgSize = m.avg; S.avgMeasured = m.measured; }
   S.batches = buildBatches(S.filtered, S.avgSize);
   const tot = S.batches.reduce((s, b) => s + b.bytes, 0), ph = S.batches.reduce((s, b) => s + b.photos, 0);
   $('#b-info').textContent = `${typeName(S.type)} · ${fmt(ph)} photos · ≈ ${fmtSize(tot)} · ${S.batches.length} lot(s)`;
-  $('#b-note').innerHTML = (S.avgMeasured
-    ? `Tailles estimées à partir d'un échantillon (≈ ${Math.round(S.avgSize / 1024)} Ko par photo). `
-    : `<b>Taille réelle des photos non mesurable</b> (≈ ${Math.round(S.avgSize / 1024)} Ko par photo supposé) : les tailles de lots sont indicatives. `) +
-    (window.showSaveFilePicker
-      ? 'Chaque ZIP est écrit directement sur le disque à mesure du téléchargement.'
-      : 'Votre navigateur construit le ZIP en mémoire : préférez Chrome ou Edge pour les lots de plus de 1 Go.');
+  $('#b-note').textContent = window.showSaveFilePicker ? '' : 'Pour les lots de plus de 1 Go, utilisez de préférence Chrome ou Edge.';
+  $('#b-note').classList.toggle('hidden', !$('#b-note').textContent);
   renderBatches();
 }
 
@@ -321,7 +373,7 @@ async function zipToFile(list, name, onProgress, signal, preferDisk) {
         .then(r => r.ok ? { x, r } : (errors.push(`${x.url}\tHTTP ${r.status}`), null))
         .catch(err => { if (signal.aborted) throw err; errors.push(`${x.url}\t${err.message}`); return null; }));
     };
-    while (next < list.length && queue.length < S.conc) launch();
+    while (next < list.length && queue.length < CONCURRENCY) launch();
     while (queue.length) {
       const res = await queue.shift();
       if (next < list.length) launch();
@@ -376,7 +428,8 @@ function toast(msg, ms = 4000) {
 
 /* ---------- Événements ---------- */
 function setType(t) {
-  S.type = t; S.page = 0; S.avgSize = null;
+  S.type = t; S.page = 0; S.avgSize = null; S.filters = [];
+  $('#btn-zip').textContent = t === 'armoires' ? '⤓ Télécharger les photos des armoires' : '⤓ Télécharger les photos des points lumineux';
   document.querySelectorAll('[data-type]').forEach(b => b.classList.toggle('active', b.dataset.type === t));
   apply();
 }
@@ -414,23 +467,65 @@ $('#b-list').addEventListener('click', ev => {
   btn.dataset.act === 'txt' ? exportLinks(b.elements, b.name.replace(/\.zip$/, '_liens.txt')) : runBatch(i);
 });
 
-$('#btn-settings').addEventListener('click', () => { $('#s-base').value = S.base; $('#s-conc').value = S.conc; $('#settings').showModal(); });
-$('#settings').addEventListener('close', () => {
-  S.base = $('#s-base').value.trim() || DEFAULT_BASE; save('base.v2', S.base);
-  S.conc = Math.min(16, Math.max(1, +$('#s-conc').value || 6)); save('conc', S.conc);
-  S.mapDirty = true; S.avgSize = null; render();
+/* ---------- Filtres par colonne ---------- */
+const OPS = { contains: 'contient', eq: 'est égal à', ne: 'est différent de', gt: 'est supérieur à', lt: 'est inférieur à', empty: 'est vide', filled: 'est renseigné' };
+const norm = v => String(v ?? '').trim().toLowerCase();
+function matchFilter(v, f) {
+  const n = parseFloat(String(v).replace(',', '.')), t = parseFloat(String(f.val).replace(',', '.'));
+  switch (f.op) {
+    case 'contains': return norm(v).includes(norm(f.val));
+    case 'eq': return norm(v) === norm(f.val);
+    case 'ne': return norm(v) !== norm(f.val);
+    case 'gt': return isFinite(n) && n > t;
+    case 'lt': return isFinite(n) && n < t;
+    case 'empty': return empty(v);
+    case 'filled': return !empty(v);
+  }
+  return true;
+}
+function renderChips() {
+  const box = $('#chips');
+  box.classList.toggle('hidden', !S.filters.length);
+  box.innerHTML = S.filters.map((f, i) =>
+    `<span class="chip"><b>${esc(f.col)}</b> ${OPS[f.op]}${['empty', 'filled'].includes(f.op) ? '' : ` « ${esc(f.val)} »`}<button data-rm="${i}" aria-label="Retirer">✕</button></span>`).join('') +
+    (S.filters.length ? '<button class="link" data-rm="all">Tout effacer</button>' : '');
+}
+function openFilter() {
+  const cols = S.cols[S.type];
+  $('#fc-col').innerHTML = cols.map(c => `<option>${esc(c)}</option>`).join('');
+  $('#fc-op').innerHTML = Object.entries(OPS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+  $('#fc-val').value = '';
+  fillValues(); $('#fdlg').showModal();
+}
+function fillValues() {
+  const col = $('#fc-col').value, counts = new Map();
+  S.data[S.type].forEach(e => { const v = e.raw[col]; if (!empty(v)) counts.set(String(v), (counts.get(String(v)) || 0) + 1); });
+  const top = [...counts].sort((a, b) => b[1] - a[1]).slice(0, 300);
+  $('#fc-values').innerHTML = top.map(([v]) => `<option value="${esc(v)}">`).join('');
+  $('#fc-hint').textContent = `${fmt(counts.size)} valeur(s) distincte(s)` + (top.length ? ` · la plus fréquente : « ${top[0][0]} »` : '');
+  const noVal = ['empty', 'filled'].includes($('#fc-op').value);
+  $('#fc-val').disabled = noVal;
+}
+$('#btn-filter').addEventListener('click', openFilter);
+$('#fc-col').addEventListener('change', fillValues);
+$('#fc-op').addEventListener('change', fillValues);
+$('#fc-cancel').addEventListener('click', () => $('#fdlg').close());
+$('#fdlg form').addEventListener('submit', ev => {
+  const op = $('#fc-op').value, val = $('#fc-val').value.trim();
+  if (!['empty', 'filled'].includes(op) && !val) { ev.preventDefault(); $('#fc-val').focus(); return; }
+  S.filters.push({ col: $('#fc-col').value, op, val });
+  S.page = 0; S.avgSize = null; apply();
 });
-const loadScript = src => new Promise((ok, ko) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = ko; document.head.appendChild(s); });
-[['#s-file-arm', 'armoires'], ['#s-file-pl', 'pl']].forEach(([sel, type]) =>
-  $(sel).addEventListener('change', async ev => {
-    const f = ev.target.files[0]; if (!f) return;
-    toast(`Lecture de ${f.name}…`, 60000);
-    try {
-      if (!window.XLSX) await loadScript(SHEETJS);
-      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
-      setData(type, XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: null, raw: true }));
-    } catch (err) { toast('Lecture impossible : ' + (err.message || f.name), 8000); }
-  }));
+$('#chips').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-rm]'); if (!b) return;
+  b.dataset.rm === 'all' ? (S.filters = []) : S.filters.splice(+b.dataset.rm, 1);
+  S.page = 0; S.avgSize = null; apply();
+});
+
+/* ---------- Aide (premier usage) ---------- */
+function openHelp() { $('#help').showModal(); }
+$('#btn-help').addEventListener('click', openHelp);
+$('#help').addEventListener('close', () => save('help.v1', '1'));
 
 loadData();
 })();

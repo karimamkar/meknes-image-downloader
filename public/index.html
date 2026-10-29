@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Photothèque SIG — Meknès</title>
+<title>SDAL Meknès — Photothèque de l'éclairage public</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -15,8 +15,9 @@
 <header class="masthead">
   <img class="logo" src="assets/logo-srm-fes-meknes.png" alt="Société Régionale Multiservices Fès-Meknès SA">
   <div class="title">
-    <h1>Photothèque de l'éclairage public</h1>
-    <p>Inventaire SIG — Ville de Meknès · armoires et points lumineux</p>
+    <h1>SDAL de la ville de Meknès</h1>
+    <p>Photothèque de l'éclairage public · armoires et points lumineux</p>
+    <p class="credit">Réalisé par <b>CETENER</b> et <b>NOVEC</b></p>
   </div>
   <img class="logo" src="assets/logo-cetener.png" alt="CETENER">
 </header>
@@ -31,18 +32,20 @@
     <button class="seg-btn view" data-view="map">◎ Carte</button>
   </div>
   <div class="spacer"></div>
-  <button id="btn-settings" class="icon-btn" title="Paramètres" aria-label="Paramètres">⚙</button>
+  <button id="btn-help" class="btn" title="Mode d'emploi">? Mode d'emploi</button>
 </nav>
 
 <section class="toolbar">
   <div class="search"><input id="q" type="search" placeholder="Rechercher : FID, code, localisation, modèle…"></div>
   <select id="f-armoire"><option value="">Toutes les armoires</option></select>
   <label class="chk"><input type="checkbox" id="f-photos"> Avec photos</label>
+  <button id="btn-filter" class="btn">⧩ Filtrer par colonne</button>
   <div class="stats" id="summary"></div>
   <div class="spacer"></div>
-  <button id="btn-links" class="btn">Liste des liens (.txt)</button>
-  <button id="btn-zip" class="btn primary">⤓ Télécharger (ZIP)</button>
+  <button id="btn-links" class="btn">Liens (.txt)</button>
+  <button id="btn-zip" class="btn primary">⤓ Télécharger les photos des armoires</button>
 </section>
+<div id="chips" class="chips hidden"></div>
 
 <main>
   <div id="list-view" class="pane">
@@ -73,27 +76,35 @@
 
 <dialog id="batches" class="modal wide">
   <div class="modal-head">
-    <div><h3>Téléchargement par lots</h3><p class="muted" id="b-info"></p></div>
+    <div><h3 id="b-title">Téléchargement par lots</h3><p class="muted" id="b-info"></p></div>
     <button class="icon-btn" id="b-close" aria-label="Fermer">✕</button>
   </div>
   <p class="note" id="b-note"></p>
   <div id="b-list" class="batch-list"></div>
 </dialog>
 
-<dialog id="settings" class="modal">
+<dialog id="fdlg" class="modal">
   <form method="dialog">
-    <div class="modal-head"><h3>Paramètres</h3></div>
-    <label>URL des images
-      <input id="s-base" placeholder="https://serveur/photos/{file}">
-      <small><code>{file}</code> est remplacé par le nom de la photo ; sinon le nom est ajouté à la fin.</small>
-    </label>
-    <label>Téléchargements simultanés<input id="s-conc" type="number" min="1" max="16" value="6"></label>
-    <details>
-      <summary>Charger d'autres fichiers Excel</summary>
-      <label>Armoires (.xlsx)<input type="file" id="s-file-arm" accept=".xlsx,.xls,.csv"></label>
-      <label>Points lumineux (.xlsx)<input type="file" id="s-file-pl" accept=".xlsx,.xls,.csv"></label>
-    </details>
-    <menu><button value="ok" class="btn primary">Enregistrer</button></menu>
+    <div class="modal-head"><h3>Filtrer par colonne</h3></div>
+    <label>Colonne<select id="fc-col"></select></label>
+    <label>Condition<select id="fc-op"></select></label>
+    <label>Valeur<input id="fc-val" list="fc-values" autocomplete="off"><datalist id="fc-values"></datalist><small id="fc-hint"></small></label>
+    <menu><button type="button" class="btn" id="fc-cancel">Annuler</button><button class="btn primary">Ajouter le filtre</button></menu>
+  </form>
+</dialog>
+
+<dialog id="help" class="modal wide">
+  <form method="dialog">
+    <div class="modal-head"><div><h3>Mode d'emploi</h3><p class="muted">SDAL de la ville de Meknès — photothèque de l'éclairage public</p></div></div>
+    <ol class="steps">
+      <li><b>Choisir le type d'élément</b> : <i>Armoires</i> ou <i>Points lumineux</i>, en haut à gauche. Le nombre d'éléments est affiché sur chaque onglet.</li>
+      <li><b>Affiner la sélection</b> : recherche libre (FID, code, rue, modèle…), choix d'une armoire, case <i>Avec photos</i>, et <i>Filtrer par colonne</i> pour combiner des critères sur n'importe quel attribut (ex. « Puissance_Luminaire 1 est supérieur à 100 »). Les filtres actifs s'affichent sous la barre ; un clic sur ✕ les retire.</li>
+      <li><b>Consulter</b> : en vue <i>Liste</i> ou <i>Carte</i>, cliquez sur un élément pour ouvrir sa fiche : photos classées par type, agrandissement plein écran (flèches ← →), attributs, et lien vers l'armoire ou ses points lumineux.</li>
+      <li><b>Carte</b> : limitée à la ville de Meknès. Les points sont regroupés aux petites échelles et tous affichés à partir du zoom 16 ; cochez <i>Tous les points</i> pour supprimer le regroupement. Fond plan ou satellite au choix.</li>
+      <li><b>Télécharger</b> : le bouton bleu prépare les photos de la sélection en lots ZIP de 1 à 2 Go, à télécharger un par un. Chaque ZIP est rangé par armoire puis par point lumineux. <i>Liste des liens</i> fournit les adresses des photos pour un gestionnaire de téléchargement. Dans une fiche, <i>ZIP</i> télécharge les photos d'un seul élément.</li>
+    </ol>
+    <p class="note">Conseil : utilisez Chrome ou Edge pour les gros téléchargements ; le navigateur demande où enregistrer chaque lot.</p>
+    <menu><button class="btn primary" value="ok">J'ai compris</button></menu>
   </form>
 </dialog>
 
