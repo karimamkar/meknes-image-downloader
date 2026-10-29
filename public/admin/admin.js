@@ -13,7 +13,7 @@ const LABELS = {
   detail_open: 'Consultation d’une fiche', zip_element: 'ZIP d’un élément', batch_plan: 'Préparation des lots',
   batch_start: 'Téléchargement d’un lot', batch_end: 'Fin de téléchargement', links_export: 'Export des liens',
   help_open: 'Mode d’emploi', admin_login: 'Connexion admin', admin_logout: 'Déconnexion admin',
-  admin_login_fail: 'Échec connexion admin',
+  admin_login_fail: 'Échec connexion admin', admin_purge: 'Purge du journal',
 };
 const tagClass = t => t.startsWith('admin') ? 'sec' : /batch|zip|links/.test(t) ? 'dl' : '';
 const S = { tab: 'events', page: 0 };
@@ -117,6 +117,27 @@ let t; ['#f-from', '#f-to', '#f-type', '#f-ip', '#f-q'].forEach(s => $(s).addEve
 $('#f-reset').addEventListener('click', () => { ['#f-from', '#f-to', '#f-type', '#f-ip', '#f-q'].forEach(s => $(s).value = ''); S.page = 0; loadTable(); });
 $('#pager').addEventListener('click', ev => { const b = ev.target.closest('[data-p]'); if (b && !b.disabled) { S.page = +b.dataset.p; loadTable(); window.scrollTo(0, 0); } });
 $('#tbl').addEventListener('click', ev => { const a = ev.target.closest('a.ip'); if (a) { $('#f-ip').value = a.dataset.ip; S.page = 0; loadTable(); } });
+$('#purge').addEventListener('click', () => {
+  $('#purge-form').reset(); $('#purge-err').textContent = ''; $('#purge-date-wrap').classList.add('hidden');
+  $('#purge-dlg').showModal(); $('#purge-key').focus();
+});
+$('#purge-scope').addEventListener('change', () => $('#purge-date-wrap').classList.toggle('hidden', $('#purge-scope').value !== 'before'));
+$('#purge-cancel').addEventListener('click', () => $('#purge-dlg').close());
+$('#purge-form').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const before = $('#purge-scope').value === 'before' ? $('#purge-date').value : '';
+  if ($('#purge-scope').value === 'before' && !before) { $('#purge-err').textContent = 'Choisissez une date.'; return; }
+  const what = before ? `les opérations antérieures au ${new Date(before).toLocaleDateString('fr-FR')}` : 'tout le journal';
+  if (!confirm(`Confirmer la suppression définitive de ${what} ?`)) return;
+  $('#purge-ok').disabled = true; $('#purge-err').textContent = '';
+  try {
+    const r = await api('purge', { method: 'POST', body: JSON.stringify({ key: $('#purge-key').value.trim(), before }) });
+    $('#purge-key').value = ''; $('#purge-dlg').close();
+    S.page = 0; await refresh();
+    alert(`${fmt(r.deleted)} opération(s) supprimée(s).`);
+  } catch (e) { $('#purge-err').textContent = e.message; }
+  $('#purge-ok').disabled = false;
+});
 $('#export').addEventListener('click', () => { location.href = '/api/admin/export.csv?' + params(); });
 
 const TOUR = () => [
@@ -127,6 +148,7 @@ const TOUR = () => [
   { el: '#f-type', title: 'Type d’opération', text: 'Par exemple « Téléchargement d’un lot » pour suivre les extractions de photos.' },
   { el: '#f-ip', title: 'Adresse IP', text: 'Saisissez une IP, ou cliquez sur une IP du tableau pour voir toute son activité.' },
   { el: '#export', title: 'Export CSV', text: 'Exporte le journal filtré (ouvrable dans Excel).' },
+  { el: '#purge', title: 'Vider le journal', text: 'Supprime définitivement tout le journal, ou les opérations antérieures à une date. La clé d’administration est redemandée et une trace de la purge est conservée. <b>Exportez le CSV avant.</b>' },
   { el: '#logout', title: 'Déconnexion', text: 'La session expire après 8 heures. Déconnectez-vous sur un poste partagé.' },
 ];
 $('#btn-help').addEventListener('click', () => Tour.run('admin', TOUR(), { force: true, title: 'Registre' }));

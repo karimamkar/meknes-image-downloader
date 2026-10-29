@@ -42,6 +42,8 @@ Chaque visite et chaque opération (consultation de fiche, recherche, filtre, pr
 
 Consultation : **`/admin`**, protégée par une clé d'administration (journal filtrable, historique des connexions, indicateurs, export CSV).
 
+**Vider le journal** (bouton rouge) : suppression de tout le journal ou des opérations antérieures à une date. La clé d'administration est redemandée, et une opération « Purge du journal » (date, IP, nombre d'opérations supprimées) est conservée.
+
 Sécurité :
 - la clé n'est stockée nulle part ; le Worker ne connaît que son empreinte SHA-256 (`ADMIN_KEY_HASH`), comparée en temps constant ;
 - verrouillage 15 min après 5 échecs depuis une même IP, blocage global après 20 échecs par heure ; chaque échec est journalisé ;

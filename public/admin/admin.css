@@ -23,3 +23,5 @@ body{min-height:100%;overflow:auto;display:block}
 a.ip{color:var(--accent);cursor:pointer;text-decoration:none}
 a.btn{text-decoration:none;color:inherit}
 .admin-main tbody tr{cursor:default}
+.btn.danger{background:var(--warn);border-color:var(--warn);color:#fff}
+.btn.danger:hover{filter:brightness(1.1);background:var(--warn)}

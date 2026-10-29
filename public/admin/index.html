@@ -51,6 +51,7 @@
     <input id="f-q" type="search" placeholder="Recherche (détail, ville, navigateur…)">
     <button class="btn" id="f-reset">Réinitialiser</button>
     <div class="spacer"></div>
+    <button class="btn danger" id="purge">Vider le journal</button>
     <button class="btn primary" id="export">Exporter (CSV)</button>
   </section>
 
@@ -59,6 +60,22 @@
     <div class="pager" id="pager"></div>
   </main>
 </section>
+
+<dialog id="purge-dlg" class="modal">
+  <form id="purge-form">
+    <div class="modal-head"><h3>Vider le journal des opérations</h3></div>
+    <p class="note">Action définitive : les opérations supprimées ne peuvent pas être récupérées. Pensez à <b>exporter le journal (CSV)</b> avant. Une trace de la purge (date, IP, nombre d'opérations supprimées) est conservée.</p>
+    <label>Périmètre
+      <select id="purge-scope"><option value="all">Tout le journal</option><option value="before">Les opérations antérieures à une date</option></select>
+    </label>
+    <label id="purge-date-wrap" class="hidden">Supprimer avant le<input type="date" id="purge-date"></label>
+    <label>Clé d'administration (confirmation)
+      <input id="purge-key" type="password" autocomplete="off" required minlength="32" maxlength="256" spellcheck="false">
+    </label>
+    <p id="purge-err" class="err"></p>
+    <menu><button type="button" class="btn" id="purge-cancel">Annuler</button><button class="btn danger" id="purge-ok">Vider définitivement</button></menu>
+  </form>
+</dialog>
 
 <script src="/js/tour.js"></script>
 <script src="/admin/admin.js"></script>

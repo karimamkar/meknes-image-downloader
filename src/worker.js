@@ -142,6 +142,22 @@ async function handleAdmin(req, url, env, store) {
     return json({ ok: true }, 200, { 'set-cookie': `${SID}=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0` });
   }
   if (route === 'me') return json({ ok: true, expires: session.expires });
+  if (route === 'purge' && req.method === 'POST') {
+    // Action destructive : la clé doit être ressaisie, même avec une session valide.
+    let body = {};
+    try { body = await req.json(); } catch {}
+    const lock = await store.checkLock(info.ip);
+    if (lock.locked) return json({ error: `Trop de tentatives. Réessayez dans ${Math.ceil(lock.wait / 60000)} min.` }, 429);
+    await new Promise(r => setTimeout(r, 400));
+    const key = String(body.key || '');
+    if (!(key.length >= 32 && key.length <= 256 && safeEqual(await sha256hex(key), env.ADMIN_KEY_HASH.toLowerCase()))) {
+      await store.fail(info);
+      return json({ error: 'Clé invalide.' }, 403);
+    }
+    const before = body.before ? Date.parse(body.before) : null;
+    if (body.before && !isFinite(before)) return json({ error: 'Date invalide.' }, 400);
+    return json(await store.purge(before, info));
+  }
   if (route === 'stats') return json(await store.stats());
   if (route === 'events') return json(await store.events(Object.fromEntries(url.searchParams)));
   if (route === 'sessions') return json(await store.sessions(Object.fromEntries(url.searchParams)));
@@ -233,6 +249,17 @@ export class AuditLog extends DurableObject {
   async deleteSession(sid, info) {
     this.sql.exec('DELETE FROM admin_sessions WHERE id_hash = ?', await sha256hex(sid));
     this._insert({ ...info, type: 'admin_logout', detail: '{}' });
+  }
+
+  async purge(before, info) {
+    const n = before
+      ? this.sql.exec('SELECT COUNT(*) AS n FROM events WHERE ts < ?', before).one().n
+      : this.sql.exec('SELECT COUNT(*) AS n FROM events').one().n;
+    if (before) this.sql.exec('DELETE FROM events WHERE ts < ?', before);
+    else this.sql.exec('DELETE FROM events');
+    // Trace conservée : le journal ne peut pas être vidé sans laisser d'empreinte.
+    this._insert({ ...info, type: 'admin_purge', detail: JSON.stringify({ supprimees: n, perimetre: before ? 'avant le ' + new Date(before).toISOString().slice(0, 10) : 'tout le journal' }) });
+    return { ok: true, deleted: n };
   }
 
   _where(p) {
